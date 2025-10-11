@@ -44,8 +44,8 @@ async function scrapeWikipediaContent(url: string): Promise<string> {
   const pathParts = urlObj.pathname.split('/');
   const articleTitle = pathParts[pathParts.length - 1];
   
-  // Use Wikipedia API to get article content in markdown-like format
-  const apiUrl = `https://en.wikipedia.org/api/rest_v1/page/html/${articleTitle}`;
+  // Use Wikipedia's text extract API for cleaner content
+  const apiUrl = `https://en.wikipedia.org/api/rest_v1/page/mobile-sections/${articleTitle}`;
   
   console.log('Fetching Wikipedia content from:', apiUrl);
   
@@ -54,14 +54,30 @@ async function scrapeWikipediaContent(url: string): Promise<string> {
     throw new Error(`Failed to fetch Wikipedia article: ${response.statusText}`);
   }
   
-  const html = await response.text();
+  const data = await response.json();
   
-  // Basic HTML to text conversion (simplified - in production use a proper parser)
-  let text = html
+  // Extract text from all sections
+  let text = data.lead?.sections?.[0]?.text || '';
+  
+  if (data.remaining?.sections) {
+    for (const section of data.remaining.sections) {
+      if (section.text) {
+        text += '\n\n' + section.text;
+      }
+    }
+  }
+  
+  // Basic HTML to text conversion
+  text = text
     .replace(/<script[^>]*>.*?<\/script>/gi, '')
     .replace(/<style[^>]*>.*?<\/style>/gi, '')
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
     .trim();
   
   return text;
@@ -128,10 +144,16 @@ serve(async (req) => {
         'X-Title': 'Grokipedia',
       },
       body: JSON.stringify({
-        model: 'x-ai/grok-2-1212',
+        model: 'x-ai/grok-4-fast',
+        max_tokens: 2000000,
         messages: [
-          { role: 'system', content: GROKIPEDIA_SYSTEM_PROMPT },
-          { role: 'user', content: `Rewrite this Wikipedia article:\n\n${originalContent.slice(0, 50000)}` }
+          { 
+            role: 'system', 
+            content: GROKIPEDIA_SYSTEM_PROMPT,
+            // Mark system prompt for caching to reduce costs on repeated calls
+            cache_control: { type: 'ephemeral' }
+          },
+          { role: 'user', content: `Rewrite this Wikipedia article:\n\n${originalContent}` }
         ],
         response_format: { type: 'json_object' },
         stream: true,
