@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Search } from "lucide-react";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const Index = () => {
   const [url, setUrl] = useState("");
@@ -176,26 +178,48 @@ const Index = () => {
         <div className="mx-auto max-w-7xl px-4 py-8">
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Main Article Area */}
-            <article className="flex-1 lg:max-w-3xl">
-              <div className="bg-background rounded border border-border p-8">
-                <h2 className="font-serif text-3xl font-bold mb-6 text-foreground border-b border-border pb-3">
-                  Rewritten Article
-                </h2>
-                <div className="prose prose-sm max-w-none text-foreground leading-relaxed whitespace-pre-wrap">
-                  {rewrittenContent || (
-                    <div className="text-muted-foreground italic">
-                      Processing article...
+            <article className="flex-1 lg:max-w-4xl">
+              <div className="bg-white border-l border-[#a2a9b1] pl-8 pr-8 py-6">
+                {rewrittenContent ? (
+                  <>
+                    <div className="wikipedia-article">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {rewrittenContent}
+                      </ReactMarkdown>
                     </div>
-                  )}
-                </div>
+                    
+                    {/* Wikipedia-style footer note */}
+                    <div className="mt-8 pt-6 border-t border-[#a2a9b1]">
+                      <div className="text-sm text-[#54595d] bg-[#f8f9fa] rounded p-4">
+                        <p className="font-semibold mb-2">📚 About Sources</p>
+                        <p>
+                          This article has been rewritten for clarity and neutrality. 
+                          To view the original Wikipedia article with all citations and sources, visit:{" "}
+                          <a 
+                            href={url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-[#0645ad] hover:underline font-medium"
+                          >
+                            {url}
+                          </a>
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-muted-foreground italic">
+                    Processing article...
+                  </div>
+                )}
               </div>
             </article>
 
             {/* Sidebar - Analysis */}
             <aside className="lg:w-80">
-              <div className="bg-card rounded border border-border p-6 sticky top-4">
-                <h3 className="font-semibold text-base mb-4 text-foreground border-b border-border pb-2">
-                  Analysis & Corrections
+              <div className="bg-[#f8f9fa] border border-[#a2a9b1] p-4 sticky top-4">
+                <h3 className="text-sm font-bold mb-3 pb-2 border-b border-[#a2a9b1]">
+                  Truth Analysis
                 </h3>
                 {insights ? (
                   <div className="space-y-4 text-sm">

@@ -106,3 +106,99 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Wikipedia-style article formatting */
+.wikipedia-article {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #202122;
+}
+
+.wikipedia-article h1 {
+  font-family: 'Linux Libertine', Georgia, 'Times New Roman', serif;
+  font-size: 1.8em;
+  font-weight: normal;
+  border-bottom: 1px solid #a2a9b1;
+  padding-bottom: 0.25em;
+  margin-top: 1em;
+  margin-bottom: 0.25em;
+}
+
+.wikipedia-article h2 {
+  font-family: 'Linux Libertine', Georgia, 'Times New Roman', serif;
+  font-size: 1.5em;
+  font-weight: normal;
+  border-bottom: 1px solid #a2a9b1;
+  margin-top: 1em;
+  padding-bottom: 0.25em;
+  margin-bottom: 0.5em;
+}
+
+.wikipedia-article h3 {
+  font-family: 'Linux Libertine', Georgia, 'Times New Roman', serif;
+  font-size: 1.2em;
+  font-weight: bold;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.wikipedia-article p {
+  margin-bottom: 0.5em;
+  margin-top: 0.5em;
+}
+
+.wikipedia-article strong {
+  font-weight: bold;
+}
+
+.wikipedia-article em {
+  font-style: italic;
+}
+
+.wikipedia-article ul,
+.wikipedia-article ol {
+  margin-left: 1.6em;
+  margin-top: 0.3em;
+  margin-bottom: 0.5em;
+}
+
+.wikipedia-article li {
+  margin-bottom: 0.1em;
+}
+
+.wikipedia-article table {
+  border-collapse: collapse;
+  border: 1px solid #a2a9b1;
+  background-color: #f8f9fa;
+  margin: 1em 0;
+}
+
+.wikipedia-article th,
+.wikipedia-article td {
+  border: 1px solid #a2a9b1;
+  padding: 0.2em 0.4em;
+}
+
+.wikipedia-article th {
+  background-color: #eaecf0;
+  font-weight: bold;
+  text-align: center;
+}
+
+.wikipedia-article a {
+  color: #0645ad;
+  text-decoration: none;
+}
+
+.wikipedia-article a:hover {
+  text-decoration: underline;
+}
+
+.wikipedia-article blockquote {
+  border-left: 3px solid #a2a9b1;
+  padding-left: 1em;
+  margin-left: 0;
+  color: #54595d;
+  font-style: italic;
+}

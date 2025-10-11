@@ -25,18 +25,24 @@ Guidelines:
 - Use precise terminology over vague descriptors
 - Present multiple credible viewpoints on controversial topics
 - Flag unverified claims clearly
+- DO NOT include citations, references, or source links in the rewritten article
+- DO NOT add footnotes or numbered references
+- DO NOT include [citation needed] tags or reference markers
+- Focus only on the core encyclopedic content without attribution markers
 
 Output format:
 Return a JSON object with:
 {
-  "rewritten_article": "The complete rewritten article in markdown format",
+  "rewritten_article": "The complete rewritten article in markdown format WITHOUT any citations, references, or source attributions. Present the information directly.",
   "insights": {
     "biases_removed": ["List of specific biases corrected"],
     "context_added": ["List of important context added"],
     "corrections": ["List of factual corrections made"],
     "sources_questioned": ["List of questionable sources flagged"]
   }
-}`;
+}
+
+CRITICAL: The rewritten_article must contain NO citations, references, or source attributions whatsoever.`;
 
 async function scrapeWikipediaContent(url: string): Promise<string> {
   const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
