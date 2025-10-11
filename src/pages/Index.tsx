@@ -33,7 +33,6 @@ import BookmarkButton from "@/components/Actions/BookmarkButton";
 import ShareButton from "@/components/Actions/ShareButton";
 import usePullToRefresh from "@/hooks/usePullToRefresh";
 import DiffView from "@/components/Compare/DiffView";
-import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
 import InsightsFilter, { InsightType } from "@/components/Insights/InsightsFilter";
 import useLocalAnalytics from "@/hooks/useLocalAnalytics";
 
@@ -873,82 +872,6 @@ const Index = () => {
               </Button>
             </div>
           </form>
-          {/* Mobile analysis bottom sheet trigger */}
-          <div className="mt-3 lg:hidden">
-            <Drawer>
-              <DrawerTrigger className="text-sm underline">Open Analysis</DrawerTrigger>
-              <DrawerContent>
-                <div className="p-4">
-                  <div className="text-base font-bold mb-2">Truth Analysis</div>
-                  <div className="mb-3">
-                    <InsightsFilter value={filters} onChange={setFilters} />
-                  </div>
-                  <div className="max-h-[60vh] overflow-auto">
-                    {insights ? (
-                      <div className="space-y-6 text-sm">
-                        {filters.includes('biases_removed') && insights.biases_removed && insights.biases_removed.length > 0 && (
-                          <div className="border-l-4 border-[#d33] pl-3">
-                            <h4 className="font-semibold mb-2 text-[#202122]">Biases Removed:</h4>
-                            <ul className="space-y-2 text-[#54595d]">
-                              {insights.biases_removed.map((bias: string, i: number) => (
-                                <li key={i} className="flex gap-2">
-                                  <span className="text-[#d33] mt-1">•</span>
-                                  <span>{bias}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        {filters.includes('context_added') && insights.context_added && insights.context_added.length > 0 && (
-                          <div className="border-l-4 border-[#0645ad] pl-3">
-                            <h4 className="font-semibold mb-2 text-[#202122]">Context Added:</h4>
-                            <ul className="space-y-2 text-[#54595d]">
-                              {insights.context_added.map((context: string, i: number) => (
-                                <li key={i} className="flex gap-2">
-                                  <span className="text-[#0645ad] mt-1">•</span>
-                                  <span>{context}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        {filters.includes('corrections') && insights.corrections && insights.corrections.length > 0 && (
-                          <div className="border-l-4 border-[#fc3] pl-3">
-                            <h4 className="font-semibold mb-2 text-[#202122]">Corrections Made:</h4>
-                            <ul className="space-y-2 text-[#54595d]">
-                              {insights.corrections.map((correction: string, i: number) => (
-                                <li key={i} className="flex gap-2">
-                                  <span className="text-[#fc3] mt-1">•</span>
-                                  <span>{correction}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        {filters.includes('narratives_challenged') && insights.narratives_challenged && insights.narratives_challenged.length > 0 && (
-                          <div className="border-l-4 border-[#f60] pl-3">
-                            <h4 className="font-semibold mb-2 text-[#202122]">Narratives Challenged:</h4>
-                            <ul className="space-y-2 text-[#54595d]">
-                              {insights.narratives_challenged.map((narrative: string, i: number) => (
-                                <li key={i} className="flex gap-2">
-                                  <span className="text-[#f60] mt-1">•</span>
-                                  <span>{narrative}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-muted-foreground italic text-sm">
-                        Analyzing content...
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </DrawerContent>
-            </Drawer>
-          </div>
         </div>
       </div>
 
