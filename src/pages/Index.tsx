@@ -181,12 +181,10 @@ const Index = () => {
             <article className="flex-1 lg:max-w-4xl">
               <div className="bg-white border-l border-[#a2a9b1] pl-8 pr-8 py-6">
                 {rewrittenContent ? (
-                  <>
-                    <div className="wikipedia-article">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {rewrittenContent}
-                      </ReactMarkdown>
-                    </div>
+                  <div className="wikipedia-article">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {rewrittenContent}
+                    </ReactMarkdown>
                     
                     {/* Wikipedia-style footer note */}
                     <div className="mt-8 pt-6 border-t border-[#a2a9b1]">
@@ -206,7 +204,7 @@ const Index = () => {
                         </p>
                       </div>
                     </div>
-                  </>
+                  </div>
                 ) : (
                   <div className="text-muted-foreground italic">
                     Processing article...
