@@ -39,43 +39,41 @@ Return a JSON object with:
 }`;
 
 async function scrapeWikipediaContent(url: string): Promise<string> {
-  // Extract article title from URL
-  const urlObj = new URL(url);
-  const pathParts = urlObj.pathname.split('/');
-  const articleTitle = pathParts[pathParts.length - 1];
-  
-  // Use Wikipedia's extract API with proper headers
-  const apiUrl = `https://en.wikipedia.org/w/api.php?action=query&format=json&prop=extracts&explaintext=1&titles=${articleTitle}`;
-  
-  console.log('Fetching Wikipedia content from:', apiUrl);
-  
-  const response = await fetch(apiUrl, {
-    headers: {
-      'User-Agent': 'Grokipedia/1.0 (https://grokipedia.lovable.app; educational tool)',
-      'Accept': 'application/json',
-    },
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Failed to fetch Wikipedia article: ${response.statusText}`);
+  const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
+  if (!firecrawlApiKey) {
+    throw new Error('FIRECRAWL_API_KEY not configured');
   }
+
+  console.log('Scraping content with Firecrawl:', url);
   
+  const response = await fetch('https://api.firecrawl.dev/v2/scrape', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${firecrawlApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      url: url,
+      onlyMainContent: true,
+      maxAge: 172800000,
+      formats: ['markdown'],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Firecrawl error:', response.status, errorText);
+    throw new Error(`Failed to scrape article: ${response.statusText}`);
+  }
+
   const data = await response.json();
   
-  // Extract the page content
-  const pages = data.query?.pages;
-  if (!pages) {
-    throw new Error('No content found in Wikipedia response');
+  if (!data.success || !data.data?.markdown) {
+    throw new Error('No content found in scrape response');
   }
-  
-  const pageId = Object.keys(pages)[0];
-  const pageContent = pages[pageId]?.extract;
-  
-  if (!pageContent) {
-    throw new Error('Article content not found');
-  }
-  
-  return pageContent;
+
+  console.log('Scraped content length:', data.data.markdown.length);
+  return data.data.markdown;
 }
 
 serve(async (req) => {
