@@ -44,43 +44,38 @@ async function scrapeWikipediaContent(url: string): Promise<string> {
   const pathParts = urlObj.pathname.split('/');
   const articleTitle = pathParts[pathParts.length - 1];
   
-  // Use Wikipedia's text extract API for cleaner content
-  const apiUrl = `https://en.wikipedia.org/api/rest_v1/page/mobile-sections/${articleTitle}`;
+  // Use Wikipedia's extract API with proper headers
+  const apiUrl = `https://en.wikipedia.org/w/api.php?action=query&format=json&prop=extracts&explaintext=1&titles=${articleTitle}`;
   
   console.log('Fetching Wikipedia content from:', apiUrl);
   
-  const response = await fetch(apiUrl);
+  const response = await fetch(apiUrl, {
+    headers: {
+      'User-Agent': 'Grokipedia/1.0 (https://grokipedia.lovable.app; educational tool)',
+      'Accept': 'application/json',
+    },
+  });
+  
   if (!response.ok) {
     throw new Error(`Failed to fetch Wikipedia article: ${response.statusText}`);
   }
   
   const data = await response.json();
   
-  // Extract text from all sections
-  let text = data.lead?.sections?.[0]?.text || '';
-  
-  if (data.remaining?.sections) {
-    for (const section of data.remaining.sections) {
-      if (section.text) {
-        text += '\n\n' + section.text;
-      }
-    }
+  // Extract the page content
+  const pages = data.query?.pages;
+  if (!pages) {
+    throw new Error('No content found in Wikipedia response');
   }
   
-  // Basic HTML to text conversion
-  text = text
-    .replace(/<script[^>]*>.*?<\/script>/gi, '')
-    .replace(/<style[^>]*>.*?<\/style>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .trim();
+  const pageId = Object.keys(pages)[0];
+  const pageContent = pages[pageId]?.extract;
   
-  return text;
+  if (!pageContent) {
+    throw new Error('Article content not found');
+  }
+  
+  return pageContent;
 }
 
 serve(async (req) => {
