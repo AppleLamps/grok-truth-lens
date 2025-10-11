@@ -9,7 +9,8 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [rewrittenContent, setRewrittenContent] = useState("");
-  const [insights, setInsights] = useState("");
+  const [insights, setInsights] = useState<any>(null);
+  const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,17 +23,99 @@ const Index = () => {
     setIsLoading(true);
     setShowResults(true);
     setRewrittenContent("");
-    setInsights("");
+    setInsights(null);
+    setError("");
 
-    // TODO: Implement API call to edge function
-    toast.info("Processing Wikipedia article...");
-    
-    // Placeholder - will be replaced with real API call
-    setTimeout(() => {
-      setRewrittenContent("This is where the rewritten article will appear...");
-      setInsights("Analysis and corrections will appear here...");
+    try {
+      toast.info("Processing Wikipedia article...");
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rewrite`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ url }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to process article');
+      }
+
+      const contentType = response.headers.get('content-type');
+      
+      // Handle cached response (JSON)
+      if (contentType?.includes('application/json')) {
+        const data = await response.json();
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        setRewrittenContent(data.rewritten_article);
+        setInsights(data.insights);
+        setIsLoading(false);
+        toast.success("Article loaded from cache!");
+        return;
+      }
+
+      // Handle streaming response (SSE)
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let accumulatedContent = '';
+
+      if (!reader) throw new Error('No response body');
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim();
+            if (data === '[DONE]') {
+              setIsLoading(false);
+              toast.success("Article rewritten successfully!");
+              
+              // Parse final accumulated content for insights
+              try {
+                const fullResult = JSON.parse(accumulatedContent);
+                setRewrittenContent(fullResult.rewritten_article || accumulatedContent);
+                setInsights(fullResult.insights);
+              } catch {
+                // Use accumulated content as-is if not JSON
+                setRewrittenContent(accumulatedContent);
+              }
+              continue;
+            }
+
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.content) {
+                accumulatedContent += parsed.content;
+                setRewrittenContent(accumulatedContent);
+              }
+            } catch (e) {
+              console.error('Error parsing SSE:', e);
+            }
+          }
+        }
+      }
+
+    } catch (err) {
+      console.error('Error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to process article';
+      setError(errorMessage);
+      toast.error(errorMessage);
       setIsLoading(false);
-    }, 2000);
+    }
   };
 
   return (
@@ -79,8 +162,17 @@ const Index = () => {
         </div>
       </div>
 
+      {/* Error Message */}
+      {error && (
+        <div className="mx-auto max-w-4xl px-4 py-4">
+          <div className="bg-destructive/10 border-destructive border rounded p-4 text-destructive">
+            <strong>Error:</strong> {error}
+          </div>
+        </div>
+      )}
+
       {/* Content Section */}
-      {showResults && (
+      {showResults && !error && (
         <div className="mx-auto max-w-7xl px-4 py-8">
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Main Article Area */}
@@ -89,7 +181,7 @@ const Index = () => {
                 <h2 className="font-serif text-3xl font-bold mb-6 text-foreground border-b border-border pb-3">
                   Rewritten Article
                 </h2>
-                <div className="prose prose-sm max-w-none text-foreground leading-relaxed">
+                <div className="prose prose-sm max-w-none text-foreground leading-relaxed whitespace-pre-wrap">
                   {rewrittenContent || (
                     <div className="text-muted-foreground italic">
                       Processing article...
@@ -105,13 +197,54 @@ const Index = () => {
                 <h3 className="font-semibold text-base mb-4 text-foreground border-b border-border pb-2">
                   Analysis & Corrections
                 </h3>
-                <div className="text-sm text-card-foreground space-y-3">
-                  {insights || (
-                    <div className="text-muted-foreground italic">
-                      Analyzing content...
-                    </div>
-                  )}
-                </div>
+                {insights ? (
+                  <div className="space-y-4 text-sm">
+                    {insights.biases_removed && insights.biases_removed.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold mb-2">Biases Removed:</h4>
+                        <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                          {insights.biases_removed.map((bias: string, i: number) => (
+                            <li key={i}>{bias}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {insights.context_added && insights.context_added.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold mb-2">Context Added:</h4>
+                        <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                          {insights.context_added.map((context: string, i: number) => (
+                            <li key={i}>{context}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {insights.corrections && insights.corrections.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold mb-2">Corrections Made:</h4>
+                        <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                          {insights.corrections.map((correction: string, i: number) => (
+                            <li key={i}>{correction}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {insights.sources_questioned && insights.sources_questioned.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold mb-2">Sources Questioned:</h4>
+                        <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                          {insights.sources_questioned.map((source: string, i: number) => (
+                            <li key={i}>{source}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground italic text-sm">
+                    Analyzing content...
+                  </div>
+                )}
               </div>
             </aside>
           </div>
@@ -119,7 +252,7 @@ const Index = () => {
       )}
 
       {/* Empty State */}
-      {!showResults && (
+      {!showResults && !error && (
         <div className="mx-auto max-w-4xl px-4 py-16 text-center">
           <p className="text-muted-foreground text-lg">
             Enter a Wikipedia URL above to get started
