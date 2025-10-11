@@ -150,7 +150,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: 'x-ai/grok-4-fast',
-        max_tokens: 32000,
+        max_tokens: 1800000,
         messages: [
           { 
             role: 'system', 
@@ -211,13 +211,21 @@ serve(async (req) => {
           // Cache the complete response
           try {
             const result = JSON.parse(fullResponse);
-            await supabase.from('article_cache').insert({
+            const { error } = await supabase.from('article_cache').upsert({
               wikipedia_url: url,
               original_content: originalContent,
               rewritten_content: result.rewritten_article,
               insights: result.insights,
+            }, {
+              onConflict: 'wikipedia_url',
+              ignoreDuplicates: false
             });
-            console.log('Cached article successfully');
+            
+            if (error) {
+              console.error('Error caching article:', error);
+            } else {
+              console.log('Cached article successfully');
+            }
           } catch (e) {
             console.error('Error caching article:', e);
           }

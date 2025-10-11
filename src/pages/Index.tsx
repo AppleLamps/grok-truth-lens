@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Search, Download, History, Trash2 } from "lucide-react";
+import { Search, Download, History, Trash2, Columns } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import jsPDF from 'jspdf';
@@ -23,6 +23,19 @@ import {
   SidebarGroupContent,
 } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import ProcessingProgress from "@/components/Loading/ProcessingProgress";
+import ReadingProgress from "@/components/Article/ReadingProgress";
+import TableOfContents from "@/components/Article/TableOfContents";
+import TTSControls from "@/components/Article/TTSControls";
+import FontSizeControls from "@/components/Article/FontSizeControls";
+import ThemeToggle from "@/components/Theme/ThemeToggle";
+import BookmarkButton from "@/components/Actions/BookmarkButton";
+import ShareButton from "@/components/Actions/ShareButton";
+import usePullToRefresh from "@/hooks/usePullToRefresh";
+import DiffView from "@/components/Compare/DiffView";
+import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
+import InsightsFilter, { InsightType } from "@/components/Insights/InsightsFilter";
+import useLocalAnalytics from "@/hooks/useLocalAnalytics";
 
 interface SearchHistoryItem {
   id: string;
@@ -39,10 +52,22 @@ const Index = () => {
   const [insights, setInsights] = useState<any>(null);
   const [error, setError] = useState("");
   const [processingStage, setProcessingStage] = useState<string>("");
+  // Progress tracking
+  type Phase = "fetching" | "analyzing" | "rewriting" | "finalizing";
+  const [phase, setPhase] = useState<Phase>("fetching");
+  const [percent, setPercent] = useState<number>(0);
+  const [etaSeconds, setEtaSeconds] = useState<number | null>(null);
+  const [expectedTotalChars, setExpectedTotalChars] = useState<number | null>(null);
+  const [receivedChars, setReceivedChars] = useState<number>(0);
+  const speedWindowRef = useRef<{ t: number; n: number }[]>([]);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const articleRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [showCompare, setShowCompare] = useState(false);
+  const [filters, setFilters] = useState<InsightType[]>(["biases_removed","context_added","corrections","narratives_challenged"]);
+  const { recordArticle } = useLocalAnalytics();
 
   // Load search history from localStorage on mount
   useEffect(() => {
@@ -54,6 +79,22 @@ const Index = () => {
         console.error('Failed to parse search history:', e);
       }
     }
+  }, []);
+
+  // Read URL params (shareable)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sharedUrl = params.get('url');
+    const view = params.get('view');
+    if (sharedUrl && sharedUrl.includes('wikipedia.org')) {
+      setUrl(sharedUrl);
+      setTimeout(() => {
+        if (formRef.current) {
+          formRef.current.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        }
+      }, 50);
+    }
+    if (view === 'compare') setShowCompare(true);
   }, []);
 
   // Save a search to history
@@ -87,9 +128,8 @@ const Index = () => {
     setUrl(historyUrl);
     // Trigger the search after setting the URL
     setTimeout(() => {
-      const form = document.querySelector('form');
-      if (form) {
-        form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+      if (formRef.current) {
+        formRef.current.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
       }
     }, 100);
   };
@@ -172,10 +212,33 @@ const Index = () => {
     setInsights(null);
     setError("");
     setProcessingStage("Fetching article...");
+    setPhase("fetching");
+    setPercent(5);
+    setEtaSeconds(null);
+    setExpectedTotalChars(null);
+    setReceivedChars(0);
+    speedWindowRef.current = [];
 
     try {
       toast.info("Processing Wikipedia article...");
       
+      // Preload Wikipedia summary to estimate size for ETA
+      try {
+        const title = url.split('/wiki/')[1];
+        if (title) {
+          const summaryResp = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`);
+          if (summaryResp.ok) {
+            const summary = await summaryResp.json();
+            const baseLen = (summary?.extract as string | undefined)?.length || 1200;
+            // Heuristic: rewritten article length ~ 3.5x summary length, clamped
+            const estTotal = Math.max(2000, Math.min(28000, Math.floor(baseLen * 3.5)));
+            setExpectedTotalChars(estTotal);
+          }
+        }
+      } catch {
+        // Ignore failures, ETA will be unknown
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rewrite`,
         {
@@ -202,18 +265,33 @@ const Index = () => {
         }
         setRewrittenContent(data.rewritten_article);
         setInsights(data.insights);
+        setPhase("finalizing");
+        setPercent(100);
+        setEtaSeconds(0);
         setIsLoading(false);
         addToSearchHistory(url);
+        
+        // Record analytics
+        recordArticle({
+          biases: data.insights?.biases_removed?.length || 0,
+          context: data.insights?.context_added?.length || 0,
+          corrections: data.insights?.corrections?.length || 0,
+          narratives: data.insights?.narratives_challenged?.length || 0,
+        });
+        
         toast.success("Article loaded from cache!");
         return;
       }
 
       // Handle streaming response (SSE)
       setProcessingStage("Analyzing content...");
+      setPhase("analyzing");
+      setPercent((prev) => Math.max(prev, 20));
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-      let accumulatedContent = '';
+      let accumulatedJson = ''; // Accumulate raw JSON
+      let partialArticle = ''; // Extract article text as we go
 
       if (!reader) throw new Error('No response body');
 
@@ -231,18 +309,29 @@ const Index = () => {
             const data = line.slice(6).trim();
             if (data === '[DONE]') {
               setProcessingStage("Finalizing...");
+              setPhase("finalizing");
+              setPercent(100);
+              setEtaSeconds(0);
               setIsLoading(false);
               addToSearchHistory(url);
               toast.success("Article rewritten successfully!");
               
-              // Parse final accumulated content for insights
+              // Parse final accumulated JSON
               try {
-                const fullResult = JSON.parse(accumulatedContent);
-                setRewrittenContent(fullResult.rewritten_article || accumulatedContent);
+                const fullResult = JSON.parse(accumulatedJson);
+                setRewrittenContent(fullResult.rewritten_article || partialArticle);
                 setInsights(fullResult.insights);
+                
+                // Record analytics
+                recordArticle({
+                  biases: fullResult.insights?.biases_removed?.length || 0,
+                  context: fullResult.insights?.context_added?.length || 0,
+                  corrections: fullResult.insights?.corrections?.length || 0,
+                  narratives: fullResult.insights?.narratives_challenged?.length || 0,
+                });
               } catch {
-                // Use accumulated content as-is if not JSON
-                setRewrittenContent(accumulatedContent);
+                // Use accumulated article as-is if JSON parsing fails
+                setRewrittenContent(partialArticle || accumulatedJson);
               }
               continue;
             }
@@ -250,8 +339,64 @@ const Index = () => {
             try {
               const parsed = JSON.parse(data);
               if (parsed.content) {
-                accumulatedContent += parsed.content;
-                setRewrittenContent(accumulatedContent);
+                accumulatedJson += parsed.content;
+                
+                // Try to extract article text from partial JSON
+                // Look for "rewritten_article":"..." pattern
+                const articleMatch = accumulatedJson.match(/"rewritten_article"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+                if (articleMatch) {
+                  // Unescape JSON string
+                  try {
+                    partialArticle = JSON.parse('"' + articleMatch[1] + '"');
+                    setRewrittenContent(partialArticle);
+                  } catch {
+                    // If unescape fails, keep previous partial
+                  }
+                }
+                
+                // Update progress metrics
+                setPhase((p) => (p === 'analyzing' ? 'rewriting' : p));
+                const now = performance.now();
+                // Track speed window
+                setReceivedChars((prev) => {
+                  const next = prev + String(parsed.content).length;
+                  speedWindowRef.current.push({ t: now, n: next });
+                  // Keep last 6 seconds
+                  const cutoff = now - 6000;
+                  speedWindowRef.current = speedWindowRef.current.filter(e => e.t >= cutoff);
+                  // Compute speed (chars/sec)
+                  const first = speedWindowRef.current[0];
+                  const last = speedWindowRef.current[speedWindowRef.current.length - 1];
+                  if (first && last && last.t > first.t) {
+                    const dn = last.n - first.n;
+                    const dt = (last.t - first.t) / 1000;
+                    const speed = dn / dt;
+                    // Update ETA when we have an estimate and expected size
+                    setEtaSeconds((curr) => {
+                      const total = expectedTotalChars;
+                      if (!total || !isFinite(speed) || speed <= 0) return curr ?? null;
+                      const remaining = Math.max(0, total - next);
+                      return remaining / speed;
+                    });
+                  }
+                  // Percent calculation with phase weights
+                  const total = expectedTotalChars;
+                  let pct: number;
+                  if (total && total > 0) {
+                    const frac = Math.max(0, Math.min(1, next / total));
+                    // Weights: fetching 10, analyzing 20, rewriting 65, finalizing 5
+                    const base = 30; // after analyze
+                    pct = 10 + 20 + Math.min(65, Math.round(65 * frac));
+                    if (phase === 'fetching') pct = 10;
+                    if (phase === 'analyzing') pct = 30;
+                  } else {
+                    // Fallback: logarithmic ramp up to 95%
+                    const frac = Math.min(1, Math.log10(1 + next / 1500));
+                    pct = Math.min(95, Math.round(30 + 65 * frac));
+                  }
+                  setPercent((prevPct) => Math.max(prevPct, pct));
+                  return next;
+                });
               }
             } catch (e) {
               console.error('Error parsing SSE:', e);
@@ -269,6 +414,13 @@ const Index = () => {
       setProcessingStage("");
     }
   };
+
+  // Pull-to-refresh on mobile
+  usePullToRefresh(articleRef as unknown as React.RefObject<HTMLElement>, () => {
+    if (url && !isLoading && formRef.current) {
+      formRef.current.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    }
+  }, { threshold: 80 });
 
   useEffect(() => {
     const handleScroll = () => {
@@ -355,7 +507,7 @@ const Index = () => {
       {/* Search Section */}
       <div className="border-b border-border bg-background">
         <div className="mx-auto max-w-4xl px-4 py-8">
-          <form onSubmit={handleSubmit}>
+          <form ref={formRef} onSubmit={handleSubmit}>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
@@ -377,16 +529,94 @@ const Index = () => {
               </Button>
             </div>
           </form>
+          {/* Mobile analysis bottom sheet trigger */}
+          <div className="mt-3 lg:hidden">
+            <Drawer>
+              <DrawerTrigger className="text-sm underline">Open Analysis</DrawerTrigger>
+              <DrawerContent>
+                <div className="p-4">
+                  <div className="text-base font-bold mb-2">Truth Analysis</div>
+                  <div className="mb-3">
+                    <InsightsFilter value={filters} onChange={setFilters} />
+                  </div>
+                  <div className="max-h-[60vh] overflow-auto">
+                    {insights ? (
+                      <div className="space-y-6 text-sm">
+                        {filters.includes('biases_removed') && insights.biases_removed && insights.biases_removed.length > 0 && (
+                          <div className="border-l-4 border-[#d33] pl-3">
+                            <h4 className="font-semibold mb-2 text-[#202122]">Biases Removed:</h4>
+                            <ul className="space-y-2 text-[#54595d]">
+                              {insights.biases_removed.map((bias: string, i: number) => (
+                                <li key={i} className="flex gap-2">
+                                  <span className="text-[#d33] mt-1">•</span>
+                                  <span>{bias}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {filters.includes('context_added') && insights.context_added && insights.context_added.length > 0 && (
+                          <div className="border-l-4 border-[#0645ad] pl-3">
+                            <h4 className="font-semibold mb-2 text-[#202122]">Context Added:</h4>
+                            <ul className="space-y-2 text-[#54595d]">
+                              {insights.context_added.map((context: string, i: number) => (
+                                <li key={i} className="flex gap-2">
+                                  <span className="text-[#0645ad] mt-1">•</span>
+                                  <span>{context}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {filters.includes('corrections') && insights.corrections && insights.corrections.length > 0 && (
+                          <div className="border-l-4 border-[#fc3] pl-3">
+                            <h4 className="font-semibold mb-2 text-[#202122]">Corrections Made:</h4>
+                            <ul className="space-y-2 text-[#54595d]">
+                              {insights.corrections.map((correction: string, i: number) => (
+                                <li key={i} className="flex gap-2">
+                                  <span className="text-[#fc3] mt-1">•</span>
+                                  <span>{correction}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {filters.includes('narratives_challenged') && insights.narratives_challenged && insights.narratives_challenged.length > 0 && (
+                          <div className="border-l-4 border-[#f60] pl-3">
+                            <h4 className="font-semibold mb-2 text-[#202122]">Narratives Challenged:</h4>
+                            <ul className="space-y-2 text-[#54595d]">
+                              {insights.narratives_challenged.map((narrative: string, i: number) => (
+                                <li key={i} className="flex gap-2">
+                                  <span className="text-[#f60] mt-1">•</span>
+                                  <span>{narrative}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-muted-foreground italic text-sm">
+                        Analyzing content...
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </DrawerContent>
+            </Drawer>
+          </div>
         </div>
       </div>
 
       {/* Progressive Loading Indicator */}
       {isLoading && (
         <div className="mx-auto max-w-4xl px-4 py-2">
-          <div className="flex items-center gap-3 text-sm text-[#54595d] bg-[#f8f9fa] border border-[#a2a9b1] rounded px-4 py-3">
-            <div className="animate-spin h-4 w-4 border-2 border-[#0645ad] border-t-transparent rounded-full"></div>
-            <span>{processingStage}</span>
-          </div>
+          <ProcessingProgress
+            phase={phase}
+            percent={percent}
+            etaSeconds={etaSeconds}
+            message={processingStage}
+          />
         </div>
       )}
 
@@ -401,36 +631,49 @@ const Index = () => {
 
       {/* Content Section */}
       {showResults && !error && (
-        <div className="mx-auto max-w-7xl px-4 py-8">
-          <div className="flex flex-col lg:flex-row gap-8">
-            {/* Main Article Area */}
-            <article className="flex-1 lg:max-w-4xl">
-              <div className="bg-white border-l border-[#a2a9b1] pl-8 pr-8 py-6">
+        <div className="bg-white">
+          <div className="mx-auto max-w-[1400px] px-4 py-6">
+            <div className="flex flex-col lg:flex-row gap-6">
+              {/* Main Article Area */}
+              <article className="flex-1 lg:max-w-[860px]">
+                {/* Reading progress */}
+                <ReadingProgress targetRef={articleRef as unknown as React.RefObject<HTMLElement>} />
                 {/* Article Header Metadata */}
                 {rewrittenContent && (
-                  <div className="mb-6 pb-4 border-b border-[#a2a9b1]">
-                    <div className="flex items-center justify-between gap-4">
+                  <div className="mb-4 pb-3 border-b border-[#a2a9b1]">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-2 text-xs text-[#54595d]">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <circle cx="12" cy="12" r="10"></circle>
                           <polyline points="12 6 12 12 16 14"></polyline>
                         </svg>
                         <span>Rewritten for clarity and neutrality</span>
-                        <span className="mx-2">•</span>
-                        <a href={url} target="_blank" rel="noopener noreferrer" className="text-[#0645ad] hover:underline">
+                        <span className="mx-2 hidden sm:inline">•</span>
+                        <a href={url} target="_blank" rel="noopener noreferrer" className="text-[#0645ad] hover:underline hidden sm:inline">
                           View original article
                         </a>
                       </div>
-                      <Button
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <TTSControls targetRef={articleRef as unknown as React.RefObject<HTMLElement>} className="hidden lg:flex" />
+                        <FontSizeControls />
+                        <ThemeToggle />
+                        <Button type="button" size="sm" variant="outline" className="flex items-center gap-1.5 text-xs h-7 px-2" onClick={() => setShowCompare((v) => !v)} aria-label="Toggle comparison">
+                          <Columns className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">Compare</span>
+                        </Button>
+                        <BookmarkButton url={url} />
+                        <ShareButton url={url} view={showCompare ? 'compare' : undefined} />
+                        <Button
                         onClick={handleExportPDF}
                         disabled={isExporting}
                         variant="outline"
                         size="sm"
-                        className="flex items-center gap-2 text-xs h-7"
-                      >
-                        <Download className="h-3 w-3" />
-                        {isExporting ? "Exporting..." : "Export PDF"}
-                      </Button>
+                        className="flex items-center gap-1.5 text-xs h-7 px-2"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">{isExporting ? "Exporting..." : "PDF"}</span>
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -483,78 +726,133 @@ const Index = () => {
               </div>
             </article>
 
-            {/* Sidebar - Analysis */}
-            <aside className="lg:w-80 w-full">
-              <div className="bg-[#f8f9fa] border border-[#a2a9b1] rounded-sm lg:sticky lg:top-4 mb-8 lg:mb-0">
-                <div className="bg-[#eaecf0] px-4 py-3 border-b border-[#a2a9b1]">
-                  <h3 className="text-base font-bold text-[#202122]">
+            {/* Sidebar - Analysis (hide when comparing) */}
+            {!showCompare && (
+            <aside className="lg:w-[320px] w-full lg:sticky lg:top-4 lg:self-start">
+              <div className="bg-[#f8f9fa] border border-[#a2a9b1]">
+                {/* Table of Contents */}
+                <div className="p-3 border-b border-[#a2a9b1]">
+                  <TableOfContents targetRef={articleRef as unknown as React.RefObject<HTMLElement>} />
+                </div>
+                
+                {/* Truth Analysis Section */}
+                <div className="bg-[#f6f6f6] px-3 py-2 border-b border-[#a2a9b1]">
+                  <h3 className="text-sm font-semibold text-[#202122]">
                     Truth Analysis
                   </h3>
                 </div>
-                <div className="p-4">
+                <div className="p-3">
                   {insights ? (
-                    <div className="space-y-6 text-sm">
-                      {insights.biases_removed && insights.biases_removed.length > 0 && (
-                        <div className="border-l-4 border-[#d33] pl-3">
-                          <h4 className="font-semibold mb-2 text-[#202122]">Biases Removed:</h4>
-                          <ul className="space-y-2 text-[#54595d]">
-                            {insights.biases_removed.map((bias: string, i: number) => (
-                              <li key={i} className="flex gap-2">
-                                <span className="text-[#d33] mt-1">•</span>
-                                <span>{bias}</span>
-                              </li>
-                            ))}
-                          </ul>
+                    <div className="space-y-4 text-sm">
+                      {/* Compact Stats Summary */}
+                      <div className="grid grid-cols-2 gap-1.5 text-xs text-center">
+                        <div className="bg-white border border-[#c8ccd1] p-1.5">
+                          <div className="font-semibold text-sm text-[#d33]">{(insights?.biases_removed?.length||0)}</div>
+                          <div className="text-[#54595d]">Biases</div>
                         </div>
-                      )}
-                      {insights.context_added && insights.context_added.length > 0 && (
-                        <div className="border-l-4 border-[#0645ad] pl-3">
-                          <h4 className="font-semibold mb-2 text-[#202122]">Context Added:</h4>
-                          <ul className="space-y-2 text-[#54595d]">
-                            {insights.context_added.map((context: string, i: number) => (
-                              <li key={i} className="flex gap-2">
-                                <span className="text-[#0645ad] mt-1">•</span>
-                                <span>{context}</span>
-                              </li>
-                            ))}
-                          </ul>
+                        <div className="bg-white border border-[#c8ccd1] p-1.5">
+                          <div className="font-semibold text-sm text-[#0645ad]">{(insights?.context_added?.length||0)}</div>
+                          <div className="text-[#54595d]">Context</div>
                         </div>
-                      )}
-                      {insights.corrections && insights.corrections.length > 0 && (
-                        <div className="border-l-4 border-[#fc3] pl-3">
-                          <h4 className="font-semibold mb-2 text-[#202122]">Corrections Made:</h4>
-                          <ul className="space-y-2 text-[#54595d]">
-                            {insights.corrections.map((correction: string, i: number) => (
-                              <li key={i} className="flex gap-2">
-                                <span className="text-[#fc3] mt-1">•</span>
-                                <span>{correction}</span>
-                              </li>
-                            ))}
-                          </ul>
+                        <div className="bg-white border border-[#c8ccd1] p-1.5">
+                          <div className="font-semibold text-sm text-[#b8860b]">{(insights?.corrections?.length||0)}</div>
+                          <div className="text-[#54595d]">Corrections</div>
                         </div>
-                      )}
-                      {insights.narratives_challenged && insights.narratives_challenged.length > 0 && (
-                        <div className="border-l-4 border-[#f60] pl-3">
-                          <h4 className="font-semibold mb-2 text-[#202122]">Narratives Challenged:</h4>
-                          <ul className="space-y-2 text-[#54595d]">
-                            {insights.narratives_challenged.map((narrative: string, i: number) => (
-                              <li key={i} className="flex gap-2">
-                                <span className="text-[#f60] mt-1">•</span>
-                                <span>{narrative}</span>
-                              </li>
-                            ))}
-                          </ul>
+                        <div className="bg-white border border-[#c8ccd1] p-1.5">
+                          <div className="font-semibold text-sm text-[#f60]">{(insights?.narratives_challenged?.length||0)}</div>
+                          <div className="text-[#54595d]">Narratives</div>
                         </div>
-                      )}
+                      </div>
+                      
+                      {/* Filter Controls */}
+                      <div className="pt-2">
+                        <InsightsFilter value={filters} onChange={setFilters} />
+                      </div>
+                      
+                      {/* Compact Lists */}
+                      <div className="space-y-3">
+                        {filters.includes('biases_removed') && insights.biases_removed && insights.biases_removed.length > 0 && (
+                          <div className="border-l-2 border-[#d33] pl-2">
+                            <h4 className="font-semibold text-xs mb-1.5 text-[#202122]">Biases Removed</h4>
+                            <ul className="space-y-1 text-xs text-[#54595d]">
+                              {insights.biases_removed.slice(0, 5).map((bias: string, i: number) => (
+                                <li key={i} className="flex gap-1.5">
+                                  <span className="text-[#d33] flex-shrink-0">•</span>
+                                  <span className="leading-snug">{bias}</span>
+                                </li>
+                              ))}
+                              {insights.biases_removed.length > 5 && (
+                                <li className="text-[#54595d] italic">+{insights.biases_removed.length - 5} more...</li>
+                              )}
+                            </ul>
+                          </div>
+                        )}
+                        {filters.includes('context_added') && insights.context_added && insights.context_added.length > 0 && (
+                          <div className="border-l-2 border-[#0645ad] pl-2">
+                            <h4 className="font-semibold text-xs mb-1.5 text-[#202122]">Context Added</h4>
+                            <ul className="space-y-1 text-xs text-[#54595d]">
+                              {insights.context_added.slice(0, 5).map((context: string, i: number) => (
+                                <li key={i} className="flex gap-1.5">
+                                  <span className="text-[#0645ad] flex-shrink-0">•</span>
+                                  <span className="leading-snug">{context}</span>
+                                </li>
+                              ))}
+                              {insights.context_added.length > 5 && (
+                                <li className="text-[#54595d] italic">+{insights.context_added.length - 5} more...</li>
+                              )}
+                            </ul>
+                          </div>
+                        )}
+                        {filters.includes('corrections') && insights.corrections && insights.corrections.length > 0 && (
+                          <div className="border-l-2 border-[#b8860b] pl-2">
+                            <h4 className="font-semibold text-xs mb-1.5 text-[#202122]">Corrections Made</h4>
+                            <ul className="space-y-1 text-xs text-[#54595d]">
+                              {insights.corrections.slice(0, 5).map((correction: string, i: number) => (
+                                <li key={i} className="flex gap-1.5">
+                                  <span className="text-[#b8860b] flex-shrink-0">•</span>
+                                  <span className="leading-snug">{correction}</span>
+                                </li>
+                              ))}
+                              {insights.corrections.length > 5 && (
+                                <li className="text-[#54595d] italic">+{insights.corrections.length - 5} more...</li>
+                              )}
+                            </ul>
+                          </div>
+                        )}
+                        {filters.includes('narratives_challenged') && insights.narratives_challenged && insights.narratives_challenged.length > 0 && (
+                          <div className="border-l-2 border-[#f60] pl-2">
+                            <h4 className="font-semibold text-xs mb-1.5 text-[#202122]">Narratives Challenged</h4>
+                            <ul className="space-y-1 text-xs text-[#54595d]">
+                              {insights.narratives_challenged.slice(0, 5).map((narrative: string, i: number) => (
+                                <li key={i} className="flex gap-1.5">
+                                  <span className="text-[#f60] flex-shrink-0">•</span>
+                                  <span className="leading-snug">{narrative}</span>
+                                </li>
+                              ))}
+                              {insights.narratives_challenged.length > 5 && (
+                                <li className="text-[#54595d] italic">+{insights.narratives_challenged.length - 5} more...</li>
+                              )}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ) : (
-                    <div className="text-muted-foreground italic text-sm">
+                    <div className="text-muted-foreground italic text-xs py-4 text-center">
                       Analyzing content...
                     </div>
                   )}
                 </div>
               </div>
             </aside>
+            )}
+            
+            {/* Compare View */}
+            {showCompare && (
+              <div className="flex-1">
+                <DiffView originalUrl={url} rewrittenMarkdown={rewrittenContent} />
+              </div>
+            )}
           </div>
         </div>
       )}

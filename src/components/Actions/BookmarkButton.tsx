@@ -1,0 +1,44 @@
+import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Bookmark, BookmarkCheck } from "lucide-react";
+
+const KEY = 'grokipedia-bookmarks';
+
+interface BookmarkItem { id: string; url: string; title: string; tags: string[]; t: number; }
+
+function load(): BookmarkItem[] {
+  try { return JSON.parse(localStorage.getItem(KEY) || '[]') as BookmarkItem[]; } catch { return []; }
+}
+function save(items: BookmarkItem[]) { localStorage.setItem(KEY, JSON.stringify(items)); }
+
+export default function BookmarkButton({ url }: { url: string }) {
+  const title = decodeURIComponent(url.split('/wiki/')[1]?.replace(/_/g, ' ') || 'Wikipedia Article');
+  const [items, setItems] = useState<BookmarkItem[]>([]);
+  useEffect(() => { setItems(load()); }, []);
+  const existing = useMemo(() => items.find(i => i.url === url), [items, url]);
+
+  const toggle = () => {
+    const current = load();
+    if (existing) {
+      const next = current.filter(i => i.url !== url);
+      save(next); setItems(next); return;
+    }
+    const tagText = window.prompt('Add comma-separated tags (optional):', '') || '';
+    const tags = tagText.split(',').map(s => s.trim()).filter(Boolean);
+    const item: BookmarkItem = { id: `${Date.now()}`, url, title, tags, t: Date.now() };
+    const next = [item, ...current].slice(0, 200);
+    save(next); setItems(next);
+  };
+
+  const Icon = existing ? BookmarkCheck : Bookmark;
+  const label = existing ? 'Remove bookmark' : 'Add bookmark';
+
+  return (
+    <Button type="button" variant="outline" size="sm" onClick={toggle} aria-label={label} title={label}>
+      <Icon className="h-3 w-3" />
+      <span className="sr-only">{label}</span>
+    </Button>
+  );
+}
+
+
