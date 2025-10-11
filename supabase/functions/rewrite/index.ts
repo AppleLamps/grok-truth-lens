@@ -138,7 +138,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: 'x-ai/grok-4-fast',
-        max_tokens: 2000000,
+        max_tokens: 32000,
         messages: [
           { 
             role: 'system', 
