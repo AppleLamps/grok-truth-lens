@@ -3,7 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://grokipedia.lovable.app',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
@@ -209,25 +209,36 @@ serve(async (req) => {
           }
           
           // Cache the complete response
+          // Wrapped in try-catch to prevent crashes from malformed responses or DB failures
           try {
-            const result = JSON.parse(fullResponse);
-            const { error } = await supabase.from('article_cache').upsert({
-              wikipedia_url: url,
-              original_content: originalContent,
-              rewritten_content: result.rewritten_article,
-              insights: result.insights,
-            }, {
-              onConflict: 'wikipedia_url',
-              ignoreDuplicates: false
-            });
-            
-            if (error) {
-              console.error('Error caching article:', error);
+            if (!fullResponse || fullResponse.trim() === '') {
+              console.warn('Empty response received, skipping cache');
             } else {
-              console.log('Cached article successfully');
+              const result = JSON.parse(fullResponse);
+              
+              if (!result.rewritten_article) {
+                console.warn('Malformed response: missing rewritten_article, skipping cache');
+              } else {
+                const { error } = await supabase.from('article_cache').upsert({
+                  wikipedia_url: url,
+                  original_content: originalContent,
+                  rewritten_content: result.rewritten_article,
+                  insights: result.insights || {},
+                }, {
+                  onConflict: 'wikipedia_url',
+                  ignoreDuplicates: false
+                });
+                
+                if (error) {
+                  console.error('Database error while caching article:', error);
+                } else {
+                  console.log('Article cached successfully');
+                }
+              }
             }
           } catch (e) {
-            console.error('Error caching article:', e);
+            // Log error but don't crash - streaming already completed successfully
+            console.error('Failed to cache article (JSON parse or DB error):', e instanceof Error ? e.message : String(e));
           }
           
           controller.enqueue(encoder.encode('data: [DONE]\n\n'));

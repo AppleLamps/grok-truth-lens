@@ -295,6 +295,42 @@ const Index = () => {
 
       if (!reader) throw new Error('No response body');
 
+      // Helper function to safely extract JSON arrays from partial JSON
+      const extractPartialInsights = (jsonStr: string) => {
+        try {
+          // Try to find the insights object in the partial JSON
+          const insightsMatch = jsonStr.match(/"insights"\s*:\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}/);
+          if (insightsMatch) {
+            // Extract individual arrays
+            const extractArray = (fieldName: string): string[] => {
+              const regex = new RegExp(`"${fieldName}"\\s*:\\s*\\[([^\\]]*)\\]`);
+              const match = jsonStr.match(regex);
+              if (match) {
+                try {
+                  // Parse the array content
+                  const arrayContent = '[' + match[1] + ']';
+                  const parsed = JSON.parse(arrayContent);
+                  return parsed;
+                } catch {
+                  return [];
+                }
+              }
+              return [];
+            };
+
+            return {
+              biases_removed: extractArray('biases_removed'),
+              context_added: extractArray('context_added'),
+              corrections: extractArray('corrections'),
+              narratives_challenged: extractArray('narratives_challenged'),
+            };
+          }
+        } catch (e) {
+          // Silently fail and return empty insights
+        }
+        return null;
+      };
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -352,6 +388,12 @@ const Index = () => {
                   } catch {
                     // If unescape fails, keep previous partial
                   }
+                }
+                
+                // Try to extract and update insights progressively
+                const partialInsights = extractPartialInsights(accumulatedJson);
+                if (partialInsights) {
+                  setInsights(partialInsights);
                 }
                 
                 // Update progress metrics
@@ -430,58 +472,322 @@ const Index = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Group search history by time periods
+  const groupedHistory = useMemo(() => {
+    const now = Date.now();
+    const oneDay = 24 * 60 * 60 * 1000;
+    const oneWeek = 7 * oneDay;
+
+    const groups = {
+      today: [] as SearchHistoryItem[],
+      yesterday: [] as SearchHistoryItem[],
+      thisWeek: [] as SearchHistoryItem[],
+      older: [] as SearchHistoryItem[],
+    };
+
+    searchHistory.forEach((item) => {
+      const diff = now - item.timestamp;
+      if (diff < oneDay) {
+        groups.today.push(item);
+      } else if (diff < 2 * oneDay) {
+        groups.yesterday.push(item);
+      } else if (diff < oneWeek) {
+        groups.thisWeek.push(item);
+      } else {
+        groups.older.push(item);
+      }
+    });
+
+    return groups;
+  }, [searchHistory]);
+
+  const clearAllHistory = () => {
+    if (window.confirm('Are you sure you want to clear all search history?')) {
+      setSearchHistory([]);
+      localStorage.removeItem('grokipedia-search-history');
+      toast.success("Search history cleared");
+    }
+  };
+
+  const formatTime = (timestamp: number) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    
+    if (hours < 1) {
+      const minutes = Math.floor(diff / (1000 * 60));
+      return minutes < 1 ? 'Just now' : `${minutes}m ago`;
+    } else if (hours < 24) {
+      return `${hours}h ago`;
+    } else {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+  };
+
   return (
     <SidebarProvider defaultOpen={false}>
       <Sidebar side="left" variant="sidebar" collapsible="offcanvas">
-        <SidebarHeader className="border-b border-[#a2a9b1] bg-[#f8f9fa]">
-          <div className="flex items-center gap-2 px-2 py-2">
-            <History className="h-5 w-5 text-[#54595d]" />
-            <h2 className="font-semibold text-[#202122]">Search History</h2>
+        <SidebarHeader className="border-b border-[#a2a9b1] bg-gradient-to-br from-[#f8f9fa] to-[#eaecf0] shadow-sm">
+          <div className="flex items-center justify-between px-3 py-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-white rounded-md border border-[#a2a9b1] shadow-sm">
+                <History className="h-4 w-4 text-[#0645ad]" />
+              </div>
+              <h2 className="font-bold text-base text-[#202122] tracking-tight">Search History</h2>
+            </div>
+            {searchHistory.length > 0 && (
+              <Button
+                onClick={clearAllHistory}
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-[#d33] hover:text-[#d33] hover:bg-red-50"
+                title="Clear all history"
+              >
+                Clear All
+              </Button>
+            )}
           </div>
         </SidebarHeader>
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <ScrollArea className="h-[calc(100vh-80px)]">
-                {searchHistory.length === 0 ? (
-                  <div className="px-4 py-8 text-center text-sm text-[#54595d]">
-                    <p>No search history yet.</p>
-                    <p className="mt-2 text-xs">Your searches will appear here.</p>
-                  </div>
-                ) : (
-                  <SidebarMenu>
-                    {searchHistory.map((item) => (
-                      <SidebarMenuItem key={item.id}>
-                        <SidebarMenuButton
-                          onClick={() => loadFromHistory(item.url)}
-                          className="w-full justify-start text-left"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm truncate text-[#202122]">
-                              {item.title}
-                            </div>
-                            <div className="text-xs text-[#54595d] mt-0.5">
-                              {new Date(item.timestamp).toLocaleDateString()}
-                            </div>
+        <SidebarContent className="bg-gradient-to-b from-white to-[#f8f9fa]">
+          <ScrollArea className="h-[calc(100vh-80px)]">
+            {searchHistory.length === 0 ? (
+              <div className="px-4 py-12 text-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#f8f9fa] to-[#eaecf0] border border-[#a2a9b1] shadow-sm mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#54595d]">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                  </svg>
+                </div>
+                <p className="text-sm font-semibold text-[#202122] mb-1">No History Yet</p>
+                <p className="text-xs text-[#54595d] leading-relaxed">
+                  Your searched articles will<br />appear here for quick access.
+                </p>
+              </div>
+            ) : (
+              <div className="p-2 space-y-4">
+                {/* Today */}
+                {groupedHistory.today.length > 0 && (
+                  <SidebarGroup>
+                    <SidebarGroupLabel className="text-xs font-bold text-[#54595d] uppercase tracking-wider mb-2 px-2">
+                      Today
+                    </SidebarGroupLabel>
+                    <SidebarGroupContent>
+                      <div className="space-y-1.5">
+                        {groupedHistory.today.map((item) => (
+                          <div
+                            key={item.id}
+                            className="group relative bg-white border border-[#c8ccd1] rounded-lg hover:border-[#0645ad] hover:shadow-md transition-all duration-200 overflow-hidden"
+                          >
+                            <button
+                              onClick={() => loadFromHistory(item.url)}
+                              className="w-full text-left p-3 pr-10"
+                            >
+                              <div className="flex items-start gap-2">
+                                <div className="flex-shrink-0 mt-0.5">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#0645ad]">
+                                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                                  </svg>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-semibold text-sm text-[#202122] group-hover:text-[#0645ad] transition-colors line-clamp-2 leading-snug mb-1">
+                                    {item.title}
+                                  </div>
+                                  <div className="text-xs text-[#54595d] flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <circle cx="12" cy="12" r="10"></circle>
+                                      <polyline points="12 6 12 12 16 14"></polyline>
+                                    </svg>
+                                    {formatTime(item.timestamp)}
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteFromHistory(item.id);
+                              }}
+                              className="absolute right-2 top-2 p-1.5 rounded-md text-[#54595d] hover:text-[#d33] hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                              title="Remove from history"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
                           </div>
-                        </SidebarMenuButton>
-                        <SidebarMenuAction
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteFromHistory(item.id);
-                          }}
-                          showOnHover
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          <span className="sr-only">Delete</span>
-                        </SidebarMenuAction>
-                      </SidebarMenuItem>
-                    ))}
-                  </SidebarMenu>
+                        ))}
+                      </div>
+                    </SidebarGroupContent>
+                  </SidebarGroup>
                 )}
-              </ScrollArea>
-            </SidebarGroupContent>
-          </SidebarGroup>
+
+                {/* Yesterday */}
+                {groupedHistory.yesterday.length > 0 && (
+                  <SidebarGroup>
+                    <SidebarGroupLabel className="text-xs font-bold text-[#54595d] uppercase tracking-wider mb-2 px-2">
+                      Yesterday
+                    </SidebarGroupLabel>
+                    <SidebarGroupContent>
+                      <div className="space-y-1.5">
+                        {groupedHistory.yesterday.map((item) => (
+                          <div
+                            key={item.id}
+                            className="group relative bg-white border border-[#c8ccd1] rounded-lg hover:border-[#0645ad] hover:shadow-md transition-all duration-200 overflow-hidden"
+                          >
+                            <button
+                              onClick={() => loadFromHistory(item.url)}
+                              className="w-full text-left p-3 pr-10"
+                            >
+                              <div className="flex items-start gap-2">
+                                <div className="flex-shrink-0 mt-0.5">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#0645ad]">
+                                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                                  </svg>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-semibold text-sm text-[#202122] group-hover:text-[#0645ad] transition-colors line-clamp-2 leading-snug mb-1">
+                                    {item.title}
+                                  </div>
+                                  <div className="text-xs text-[#54595d] flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <circle cx="12" cy="12" r="10"></circle>
+                                      <polyline points="12 6 12 12 16 14"></polyline>
+                                    </svg>
+                                    {formatTime(item.timestamp)}
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteFromHistory(item.id);
+                              }}
+                              className="absolute right-2 top-2 p-1.5 rounded-md text-[#54595d] hover:text-[#d33] hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                              title="Remove from history"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </SidebarGroupContent>
+                  </SidebarGroup>
+                )}
+
+                {/* This Week */}
+                {groupedHistory.thisWeek.length > 0 && (
+                  <SidebarGroup>
+                    <SidebarGroupLabel className="text-xs font-bold text-[#54595d] uppercase tracking-wider mb-2 px-2">
+                      This Week
+                    </SidebarGroupLabel>
+                    <SidebarGroupContent>
+                      <div className="space-y-1.5">
+                        {groupedHistory.thisWeek.map((item) => (
+                          <div
+                            key={item.id}
+                            className="group relative bg-white border border-[#c8ccd1] rounded-lg hover:border-[#0645ad] hover:shadow-md transition-all duration-200 overflow-hidden"
+                          >
+                            <button
+                              onClick={() => loadFromHistory(item.url)}
+                              className="w-full text-left p-3 pr-10"
+                            >
+                              <div className="flex items-start gap-2">
+                                <div className="flex-shrink-0 mt-0.5">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#0645ad]">
+                                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                                  </svg>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-semibold text-sm text-[#202122] group-hover:text-[#0645ad] transition-colors line-clamp-2 leading-snug mb-1">
+                                    {item.title}
+                                  </div>
+                                  <div className="text-xs text-[#54595d] flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <circle cx="12" cy="12" r="10"></circle>
+                                      <polyline points="12 6 12 12 16 14"></polyline>
+                                    </svg>
+                                    {formatTime(item.timestamp)}
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteFromHistory(item.id);
+                              }}
+                              className="absolute right-2 top-2 p-1.5 rounded-md text-[#54595d] hover:text-[#d33] hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                              title="Remove from history"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </SidebarGroupContent>
+                  </SidebarGroup>
+                )}
+
+                {/* Older */}
+                {groupedHistory.older.length > 0 && (
+                  <SidebarGroup>
+                    <SidebarGroupLabel className="text-xs font-bold text-[#54595d] uppercase tracking-wider mb-2 px-2">
+                      Older
+                    </SidebarGroupLabel>
+                    <SidebarGroupContent>
+                      <div className="space-y-1.5">
+                        {groupedHistory.older.map((item) => (
+                          <div
+                            key={item.id}
+                            className="group relative bg-white border border-[#c8ccd1] rounded-lg hover:border-[#0645ad] hover:shadow-md transition-all duration-200 overflow-hidden"
+                          >
+                            <button
+                              onClick={() => loadFromHistory(item.url)}
+                              className="w-full text-left p-3 pr-10"
+                            >
+                              <div className="flex items-start gap-2">
+                                <div className="flex-shrink-0 mt-0.5">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#0645ad]">
+                                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                                  </svg>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-semibold text-sm text-[#202122] group-hover:text-[#0645ad] transition-colors line-clamp-2 leading-snug mb-1">
+                                    {item.title}
+                                  </div>
+                                  <div className="text-xs text-[#54595d] flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <circle cx="12" cy="12" r="10"></circle>
+                                      <polyline points="12 6 12 12 16 14"></polyline>
+                                    </svg>
+                                    {formatTime(item.timestamp)}
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteFromHistory(item.id);
+                              }}
+                              className="absolute right-2 top-2 p-1.5 rounded-md text-[#54595d] hover:text-[#d33] hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                              title="Remove from history"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </SidebarGroupContent>
+                  </SidebarGroup>
+                )}
+              </div>
+            )}
+          </ScrollArea>
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
@@ -492,12 +798,50 @@ const Index = () => {
               <div className="flex items-center gap-4 mb-4">
                 <SidebarTrigger className="h-8 w-8" />
                 <div className="flex-1 text-center">
-                  <h1 className="font-serif text-5xl font-bold tracking-tight text-foreground mb-1">
-                    GROKIPEDIA
-                  </h1>
-                  <p className="text-sm text-muted-foreground">
-                    The Truth-Seeking Encyclopedia
-                  </p>
+                  <div className="inline-block">
+                    <h1 
+                      onClick={() => {
+                        setShowResults(false);
+                        setRewrittenContent("");
+                        setInsights(null);
+                        setError("");
+                        setUrl("");
+                        setShowCompare(false);
+                        window.history.replaceState({}, '', '/');
+                      }}
+                      className="font-serif text-5xl font-bold tracking-tight text-foreground mb-1 cursor-pointer hover:opacity-80 transition-opacity"
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          setShowResults(false);
+                          setRewrittenContent("");
+                          setInsights(null);
+                          setError("");
+                          setUrl("");
+                          setShowCompare(false);
+                          window.history.replaceState({}, '', '/');
+                        }
+                      }}
+                      aria-label="Return to home"
+                    >
+                      GROKIPEDIA
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                      The Truth-Seeking Encyclopedia
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      by{" "}
+                      <a 
+                        href="https://x.com/lamps_apple" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-[#0645ad] hover:underline font-medium"
+                      >
+                        @lamps_apple
+                      </a>
+                    </p>
+                  </div>
                 </div>
                 <div className="w-8"></div> {/* Spacer for centering */}
               </div>
@@ -508,22 +852,22 @@ const Index = () => {
       <div className="border-b border-border bg-background">
         <div className="mx-auto max-w-4xl px-4 py-8">
           <form ref={formRef} onSubmit={handleSubmit}>
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#72777d]" />
                 <Input
                   type="url"
                   placeholder="Enter Wikipedia URL (e.g., https://en.wikipedia.org/wiki/...)"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  className="h-11 pl-10 pr-4 border-border"
+                  className="h-12 pl-10 pr-4 border-[#a2a9b1] bg-white text-[#202122] placeholder:text-[#72777d] focus:border-[#0645ad] focus:ring-2 focus:ring-[#0645ad]/20 transition-all shadow-sm"
                   disabled={isLoading}
                 />
               </div>
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="h-11 px-6"
+                className="h-12 px-8 bg-[#0645ad] hover:bg-[#0b5cb5] text-white font-medium shadow-md hover:shadow-lg transition-all disabled:opacity-50"
               >
                 {isLoading ? "Processing..." : "Search"}
               </Button>
@@ -623,8 +967,17 @@ const Index = () => {
       {/* Error Message */}
       {error && (
         <div className="mx-auto max-w-4xl px-4 py-4">
-          <div className="bg-destructive/10 border-destructive border rounded p-4 text-destructive">
-            <strong>Error:</strong> {error}
+          <div className="bg-red-50 border-2 border-red-200 rounded-lg p-5 text-red-800 shadow-md">
+            <div className="flex items-start gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500 flex-shrink-0 mt-0.5">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <div>
+                <strong className="font-bold">Error:</strong> <span className="font-medium">{error}</span>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -633,14 +986,14 @@ const Index = () => {
       {showResults && !error && (
         <div className="bg-white">
           <div className="mx-auto max-w-[1400px] px-4 py-6">
-            <div className="flex flex-col lg:flex-row gap-6">
+            <div className="flex flex-col lg:flex-row gap-6 lg:justify-center">
               {/* Main Article Area */}
-              <article className="flex-1 lg:max-w-[860px]">
+              <article className="w-full lg:max-w-[860px]">
                 {/* Reading progress */}
                 <ReadingProgress targetRef={articleRef as unknown as React.RefObject<HTMLElement>} />
                 {/* Article Header Metadata */}
                 {rewrittenContent && (
-                  <div className="mb-4 pb-3 border-b border-[#a2a9b1]">
+                  <div className="mb-6 pb-4 border-b border-[#a2a9b1] bg-gradient-to-r from-[#f8f9fa]/50 to-transparent rounded-t px-4 py-3 -mx-4 shadow-sm">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-2 text-xs text-[#54595d]">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -653,12 +1006,18 @@ const Index = () => {
                           View original article
                         </a>
                       </div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <TTSControls targetRef={articleRef as unknown as React.RefObject<HTMLElement>} className="hidden lg:flex" />
-                        <FontSizeControls />
-                        <ThemeToggle />
-                        <Button type="button" size="sm" variant="outline" className="flex items-center gap-1.5 text-xs h-7 px-2" onClick={() => setShowCompare((v) => !v)} aria-label="Toggle comparison">
-                          <Columns className="h-3.5 w-3.5" />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-1 border border-[#a2a9b1] bg-[#f8f9fa] rounded">
+                          <TTSControls targetRef={articleRef as unknown as React.RefObject<HTMLElement>} className="hidden lg:flex" />
+                        </div>
+                        <div className="flex items-center gap-1 border border-[#a2a9b1] bg-[#f8f9fa] rounded">
+                          <FontSizeControls />
+                        </div>
+                        <div className="border border-[#a2a9b1] bg-[#f8f9fa] rounded">
+                          <ThemeToggle />
+                        </div>
+                        <Button type="button" size="sm" variant="ghost" className="h-8 px-3 text-xs border border-[#a2a9b1] bg-[#f8f9fa] hover:bg-white" onClick={() => setShowCompare((v) => !v)} aria-label="Toggle comparison">
+                          <Columns className="h-3.5 w-3.5 mr-1.5" />
                           <span className="hidden sm:inline">Compare</span>
                         </Button>
                         <BookmarkButton url={url} />
@@ -666,11 +1025,11 @@ const Index = () => {
                         <Button
                         onClick={handleExportPDF}
                         disabled={isExporting}
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        className="flex items-center gap-1.5 text-xs h-7 px-2"
+                        className="h-8 px-3 text-xs border border-[#a2a9b1] bg-[#f8f9fa] hover:bg-white disabled:opacity-50"
                         >
-                          <Download className="h-3.5 w-3.5" />
+                          <Download className="h-3.5 w-3.5 mr-1.5" />
                           <span className="hidden sm:inline">{isExporting ? "Exporting..." : "PDF"}</span>
                         </Button>
                       </div>
@@ -684,23 +1043,23 @@ const Index = () => {
                     </ReactMarkdown>
                     
                     {/* Wikipedia-style footer note */}
-                    <div className="mt-8 pt-6 border-t border-[#a2a9b1]">
-                      <div className="text-sm text-[#54595d] bg-[#f8f9fa] rounded p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#54595d]">
+                    <div className="mt-10 pt-6 border-t-2 border-[#a2a9b1]">
+                      <div className="text-sm text-[#54595d] bg-gradient-to-br from-[#f8f9fa] to-[#eaecf0] rounded-lg border border-[#a2a9b1] p-5 shadow-sm">
+                        <div className="flex items-center gap-2 mb-3">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#0645ad]">
                             <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
                             <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
                           </svg>
-                          <p className="font-semibold">About Sources</p>
+                          <p className="font-bold text-[#202122]">About Sources</p>
                         </div>
-                        <p>
+                        <p className="leading-relaxed">
                           This article has been rewritten for clarity and neutrality. 
                           To view the original Wikipedia article with all citations and sources, visit:{" "}
                           <a 
                             href={url} 
                             target="_blank" 
                             rel="noopener noreferrer"
-                            className="text-[#0645ad] hover:underline font-medium"
+                            className="text-[#0645ad] hover:underline font-semibold break-all"
                           >
                             {url}
                           </a>
@@ -723,21 +1082,20 @@ const Index = () => {
                     </div>
                   </div>
                 )}
-              </div>
             </article>
 
             {/* Sidebar - Analysis (hide when comparing) */}
             {!showCompare && (
             <aside className="lg:w-[320px] w-full lg:sticky lg:top-4 lg:self-start">
-              <div className="bg-[#f8f9fa] border border-[#a2a9b1]">
+              <div className="bg-[#f8f9fa] border border-[#a2a9b1] rounded-lg shadow-md overflow-hidden">
                 {/* Table of Contents */}
                 <div className="p-3 border-b border-[#a2a9b1]">
                   <TableOfContents targetRef={articleRef as unknown as React.RefObject<HTMLElement>} />
                 </div>
                 
                 {/* Truth Analysis Section */}
-                <div className="bg-[#f6f6f6] px-3 py-2 border-b border-[#a2a9b1]">
-                  <h3 className="text-sm font-semibold text-[#202122]">
+                <div className="bg-gradient-to-r from-[#eaecf0] to-[#f6f6f6] px-4 py-3 border-b border-[#a2a9b1]">
+                  <h3 className="text-sm font-bold text-[#202122] tracking-wide">
                     Truth Analysis
                   </h3>
                 </div>
@@ -745,22 +1103,22 @@ const Index = () => {
                   {insights ? (
                     <div className="space-y-4 text-sm">
                       {/* Compact Stats Summary */}
-                      <div className="grid grid-cols-2 gap-1.5 text-xs text-center">
-                        <div className="bg-white border border-[#c8ccd1] p-1.5">
-                          <div className="font-semibold text-sm text-[#d33]">{(insights?.biases_removed?.length||0)}</div>
-                          <div className="text-[#54595d]">Biases</div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
+                          <div className="font-bold text-2xl text-[#d33] mb-1">{(insights?.biases_removed?.length||0)}</div>
+                          <div className="text-[#54595d] text-xs font-medium">Biases</div>
                         </div>
-                        <div className="bg-white border border-[#c8ccd1] p-1.5">
-                          <div className="font-semibold text-sm text-[#0645ad]">{(insights?.context_added?.length||0)}</div>
-                          <div className="text-[#54595d]">Context</div>
+                        <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
+                          <div className="font-bold text-2xl text-[#0645ad] mb-1">{(insights?.context_added?.length||0)}</div>
+                          <div className="text-[#54595d] text-xs font-medium">Context</div>
                         </div>
-                        <div className="bg-white border border-[#c8ccd1] p-1.5">
-                          <div className="font-semibold text-sm text-[#b8860b]">{(insights?.corrections?.length||0)}</div>
-                          <div className="text-[#54595d]">Corrections</div>
+                        <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
+                          <div className="font-bold text-2xl text-[#b8860b] mb-1">{(insights?.corrections?.length||0)}</div>
+                          <div className="text-[#54595d] text-xs font-medium">Corrections</div>
                         </div>
-                        <div className="bg-white border border-[#c8ccd1] p-1.5">
-                          <div className="font-semibold text-sm text-[#f60]">{(insights?.narratives_challenged?.length||0)}</div>
-                          <div className="text-[#54595d]">Narratives</div>
+                        <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
+                          <div className="font-bold text-2xl text-[#f60] mb-1">{(insights?.narratives_challenged?.length||0)}</div>
+                          <div className="text-[#54595d] text-xs font-medium">Narratives</div>
                         </div>
                       </div>
                       
@@ -771,68 +1129,127 @@ const Index = () => {
                       
                       {/* Compact Lists */}
                       <div className="space-y-3">
-                        {filters.includes('biases_removed') && insights.biases_removed && insights.biases_removed.length > 0 && (
+                        {/* Biases Removed */}
+                        {filters.includes('biases_removed') && (
                           <div className="border-l-2 border-[#d33] pl-2">
                             <h4 className="font-semibold text-xs mb-1.5 text-[#202122]">Biases Removed</h4>
-                            <ul className="space-y-1 text-xs text-[#54595d]">
-                              {insights.biases_removed.slice(0, 5).map((bias: string, i: number) => (
-                                <li key={i} className="flex gap-1.5">
-                                  <span className="text-[#d33] flex-shrink-0">•</span>
-                                  <span className="leading-snug">{bias}</span>
-                                </li>
-                              ))}
-                              {insights.biases_removed.length > 5 && (
-                                <li className="text-[#54595d] italic">+{insights.biases_removed.length - 5} more...</li>
-                              )}
-                            </ul>
+                            {insights.biases_removed && insights.biases_removed.length > 0 ? (
+                              <ul className="space-y-1 text-xs text-[#54595d]">
+                                {insights.biases_removed.slice(0, 5).map((bias: string, i: number) => (
+                                  <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
+                                    <span className="text-[#d33] flex-shrink-0">•</span>
+                                    <span className="leading-snug">{bias}</span>
+                                  </li>
+                                ))}
+                                {insights.biases_removed.length > 5 && (
+                                  <li className="text-[#54595d] italic">+{insights.biases_removed.length - 5} more...</li>
+                                )}
+                              </ul>
+                            ) : isLoading ? (
+                              <div className="space-y-1.5">
+                                {[1, 2, 3].map((i) => (
+                                  <div key={i} className="flex gap-1.5 animate-pulse">
+                                    <span className="text-[#d33] flex-shrink-0">•</span>
+                                    <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-[#72777d] italic">None detected</p>
+                            )}
                           </div>
                         )}
-                        {filters.includes('context_added') && insights.context_added && insights.context_added.length > 0 && (
+                        
+                        {/* Context Added */}
+                        {filters.includes('context_added') && (
                           <div className="border-l-2 border-[#0645ad] pl-2">
                             <h4 className="font-semibold text-xs mb-1.5 text-[#202122]">Context Added</h4>
-                            <ul className="space-y-1 text-xs text-[#54595d]">
-                              {insights.context_added.slice(0, 5).map((context: string, i: number) => (
-                                <li key={i} className="flex gap-1.5">
-                                  <span className="text-[#0645ad] flex-shrink-0">•</span>
-                                  <span className="leading-snug">{context}</span>
-                                </li>
-                              ))}
-                              {insights.context_added.length > 5 && (
-                                <li className="text-[#54595d] italic">+{insights.context_added.length - 5} more...</li>
-                              )}
-                            </ul>
+                            {insights.context_added && insights.context_added.length > 0 ? (
+                              <ul className="space-y-1 text-xs text-[#54595d]">
+                                {insights.context_added.slice(0, 5).map((context: string, i: number) => (
+                                  <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
+                                    <span className="text-[#0645ad] flex-shrink-0">•</span>
+                                    <span className="leading-snug">{context}</span>
+                                  </li>
+                                ))}
+                                {insights.context_added.length > 5 && (
+                                  <li className="text-[#54595d] italic">+{insights.context_added.length - 5} more...</li>
+                                )}
+                              </ul>
+                            ) : isLoading ? (
+                              <div className="space-y-1.5">
+                                {[1, 2, 3].map((i) => (
+                                  <div key={i} className="flex gap-1.5 animate-pulse">
+                                    <span className="text-[#0645ad] flex-shrink-0">•</span>
+                                    <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-[#72777d] italic">None added</p>
+                            )}
                           </div>
                         )}
-                        {filters.includes('corrections') && insights.corrections && insights.corrections.length > 0 && (
+                        
+                        {/* Corrections Made */}
+                        {filters.includes('corrections') && (
                           <div className="border-l-2 border-[#b8860b] pl-2">
                             <h4 className="font-semibold text-xs mb-1.5 text-[#202122]">Corrections Made</h4>
-                            <ul className="space-y-1 text-xs text-[#54595d]">
-                              {insights.corrections.slice(0, 5).map((correction: string, i: number) => (
-                                <li key={i} className="flex gap-1.5">
-                                  <span className="text-[#b8860b] flex-shrink-0">•</span>
-                                  <span className="leading-snug">{correction}</span>
-                                </li>
-                              ))}
-                              {insights.corrections.length > 5 && (
-                                <li className="text-[#54595d] italic">+{insights.corrections.length - 5} more...</li>
-                              )}
-                            </ul>
+                            {insights.corrections && insights.corrections.length > 0 ? (
+                              <ul className="space-y-1 text-xs text-[#54595d]">
+                                {insights.corrections.slice(0, 5).map((correction: string, i: number) => (
+                                  <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
+                                    <span className="text-[#b8860b] flex-shrink-0">•</span>
+                                    <span className="leading-snug">{correction}</span>
+                                  </li>
+                                ))}
+                                {insights.corrections.length > 5 && (
+                                  <li className="text-[#54595d] italic">+{insights.corrections.length - 5} more...</li>
+                                )}
+                              </ul>
+                            ) : isLoading ? (
+                              <div className="space-y-1.5">
+                                {[1, 2, 3].map((i) => (
+                                  <div key={i} className="flex gap-1.5 animate-pulse">
+                                    <span className="text-[#b8860b] flex-shrink-0">•</span>
+                                    <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-[#72777d] italic">None made</p>
+                            )}
                           </div>
                         )}
-                        {filters.includes('narratives_challenged') && insights.narratives_challenged && insights.narratives_challenged.length > 0 && (
+                        
+                        {/* Narratives Challenged */}
+                        {filters.includes('narratives_challenged') && (
                           <div className="border-l-2 border-[#f60] pl-2">
                             <h4 className="font-semibold text-xs mb-1.5 text-[#202122]">Narratives Challenged</h4>
-                            <ul className="space-y-1 text-xs text-[#54595d]">
-                              {insights.narratives_challenged.slice(0, 5).map((narrative: string, i: number) => (
-                                <li key={i} className="flex gap-1.5">
-                                  <span className="text-[#f60] flex-shrink-0">•</span>
-                                  <span className="leading-snug">{narrative}</span>
-                                </li>
-                              ))}
-                              {insights.narratives_challenged.length > 5 && (
-                                <li className="text-[#54595d] italic">+{insights.narratives_challenged.length - 5} more...</li>
-                              )}
-                            </ul>
+                            {insights.narratives_challenged && insights.narratives_challenged.length > 0 ? (
+                              <ul className="space-y-1 text-xs text-[#54595d]">
+                                {insights.narratives_challenged.slice(0, 5).map((narrative: string, i: number) => (
+                                  <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
+                                    <span className="text-[#f60] flex-shrink-0">•</span>
+                                    <span className="leading-snug">{narrative}</span>
+                                  </li>
+                                ))}
+                                {insights.narratives_challenged.length > 5 && (
+                                  <li className="text-[#54595d] italic">+{insights.narratives_challenged.length - 5} more...</li>
+                                )}
+                              </ul>
+                            ) : isLoading ? (
+                              <div className="space-y-1.5">
+                                {[1, 2, 3].map((i) => (
+                                  <div key={i} className="flex gap-1.5 animate-pulse">
+                                    <span className="text-[#f60] flex-shrink-0">•</span>
+                                    <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-[#72777d] italic">None challenged</p>
+                            )}
                           </div>
                         )}
                       </div>
@@ -855,30 +1272,31 @@ const Index = () => {
             )}
           </div>
         </div>
+      </div>
       )}
 
       {/* Empty State */}
       {!showResults && !error && (
         <div className="mx-auto max-w-4xl px-4 py-24">
-          <div className="text-center space-y-6">
-            <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-[#f8f9fa] border-2 border-[#a2a9b1]">
-              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#54595d]">
+          <div className="text-center space-y-8">
+            <div className="inline-flex items-center justify-center w-28 h-28 rounded-full bg-gradient-to-br from-[#f8f9fa] to-[#eaecf0] border-2 border-[#a2a9b1] shadow-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#54595d]">
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
             </div>
-            <div>
-              <h2 className="text-2xl font-serif font-bold text-[#202122] mb-2">
+            <div className="space-y-3">
+              <h2 className="text-3xl font-serif font-bold text-[#202122]">
                 Search for Truth
               </h2>
-              <p className="text-[#54595d] text-base max-w-md mx-auto">
+              <p className="text-[#54595d] text-lg max-w-xl mx-auto leading-relaxed">
                 Enter any Wikipedia article URL to see it rewritten with bias removed 
                 and context added for a more balanced perspective.
               </p>
             </div>
-            <div className="text-sm text-[#54595d] bg-[#f8f9fa] border border-[#a2a9b1] rounded p-4 max-w-xl mx-auto">
-              <p className="font-semibold mb-1">Example:</p>
-              <code className="text-[#0645ad]">https://en.wikipedia.org/wiki/Elon_Musk</code>
+            <div className="text-sm text-[#54595d] bg-gradient-to-br from-[#f8f9fa] to-white border border-[#a2a9b1] rounded-lg p-5 max-w-xl mx-auto shadow-sm hover:shadow-md transition-shadow">
+              <p className="font-semibold mb-2 text-[#202122]">Example:</p>
+              <code className="text-[#0645ad] bg-white px-3 py-1.5 rounded border border-[#c8ccd1] inline-block font-mono text-xs">https://en.wikipedia.org/wiki/Elon_Musk</code>
             </div>
           </div>
         </div>
@@ -888,10 +1306,10 @@ const Index = () => {
           {showBackToTop && (
             <button
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              className="fixed bottom-8 right-8 bg-[#f8f9fa] border-2 border-[#a2a9b1] rounded-full p-3 shadow-lg hover:bg-white transition-all"
+              className="fixed bottom-8 right-8 bg-white border-2 border-[#a2a9b1] rounded-full p-4 shadow-xl hover:shadow-2xl hover:bg-[#0645ad] hover:border-[#0645ad] hover:scale-110 transition-all duration-300 group z-50"
               aria-label="Back to top"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#54595d] group-hover:text-white transition-colors">
                 <line x1="12" y1="19" x2="12" y2="5"></line>
                 <polyline points="5 12 12 5 19 12"></polyline>
               </svg>

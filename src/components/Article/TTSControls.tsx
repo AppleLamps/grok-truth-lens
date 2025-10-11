@@ -154,22 +154,20 @@ export default function TTSControls({ targetRef, className }: TTSControlsProps) 
   const canUse = typeof window !== 'undefined' && 'speechSynthesis' in window;
 
   return (
-    <div className={cn("flex items-center gap-2", className)} aria-label="Text to speech controls">
-      <div className="flex items-center gap-1">
-        <Button type="button" size="sm" variant="outline" onClick={handlePlay} disabled={!canUse} aria-label={isPaused ? "Resume" : "Play"}>
-          <Play className="h-4 w-4" />
-        </Button>
-        <Button type="button" size="sm" variant="outline" onClick={handlePause} disabled={!canUse || !isSpeaking || isPaused} aria-label="Pause">
-          <Pause className="h-4 w-4" />
-        </Button>
-        <Button type="button" size="sm" variant="outline" onClick={handleStop} disabled={!canUse} aria-label="Stop">
-          <Square className="h-4 w-4" />
-        </Button>
-      </div>
+    <div className={cn("flex items-center gap-1 p-0.5", className)} aria-label="Text to speech controls">
+      <Button type="button" size="sm" variant="ghost" onClick={handlePlay} disabled={!canUse} aria-label={isPaused ? "Resume" : "Play"} className="h-7 w-7 p-0 hover:bg-white disabled:opacity-30">
+        <Play className="h-3.5 w-3.5" />
+      </Button>
+      <Button type="button" size="sm" variant="ghost" onClick={handlePause} disabled={!canUse || !isSpeaking || isPaused} aria-label="Pause" className="h-7 w-7 p-0 hover:bg-white disabled:opacity-30">
+        <Pause className="h-3.5 w-3.5" />
+      </Button>
+      <Button type="button" size="sm" variant="ghost" onClick={handleStop} disabled={!canUse} aria-label="Stop" className="h-7 w-7 p-0 hover:bg-white disabled:opacity-30">
+        <Square className="h-3.5 w-3.5" />
+      </Button>
       <label className="sr-only" htmlFor="voice-select">Voice</label>
       <select
         id="voice-select"
-        className="h-8 border rounded px-2 text-sm max-w-[220px]"
+        className="h-7 border-0 bg-transparent rounded px-2 text-xs max-w-[180px] focus:bg-white focus:outline-none"
         value={voiceIndex}
         onChange={(e) => setVoiceIndex(Number(e.target.value))}
         aria-label="Voice"
@@ -178,9 +176,9 @@ export default function TTSControls({ targetRef, className }: TTSControlsProps) 
           <option key={`${v.name}-${i}`} value={i}>{v.name} {v.lang ? `(${v.lang})` : ''}</option>
         ))}
       </select>
-      <div className="flex items-center gap-2">
-        <label htmlFor="rate" className="text-xs text-muted-foreground">Rate</label>
-        <input id="rate" type="range" min={0.75} max={1.25} step={0.05} value={rate} onChange={(e) => setRate(Number(e.target.value))} aria-label="Rate" />
+      <div className="flex items-center gap-1.5 px-2">
+        <label htmlFor="rate" className="text-xs text-[#54595d]">Rate</label>
+        <input id="rate" type="range" min={0.75} max={1.25} step={0.05} value={rate} onChange={(e) => setRate(Number(e.target.value))} aria-label="Rate" className="w-16" />
       </div>
     </div>
   );

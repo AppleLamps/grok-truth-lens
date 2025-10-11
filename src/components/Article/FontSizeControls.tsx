@@ -22,10 +22,10 @@ export default function FontSizeControls() {
   };
 
   return (
-    <div className="flex items-center gap-1" aria-label="Font size">
-      <Button type="button" size="sm" variant="outline" onClick={() => apply(size - 1)} aria-label="Decrease font size">A</Button>
-      <Button type="button" size="sm" variant="outline" onClick={() => apply(14)} aria-label="Reset font size">A</Button>
-      <Button type="button" size="sm" variant="outline" onClick={() => apply(size + 1)} aria-label="Increase font size" className="text-lg">A</Button>
+    <div className="flex items-center gap-1 p-0.5" aria-label="Font size">
+      <Button type="button" size="sm" variant="ghost" onClick={() => apply(size - 1)} aria-label="Decrease font size" className="h-7 w-7 p-0 text-xs hover:bg-white">A</Button>
+      <Button type="button" size="sm" variant="ghost" onClick={() => apply(14)} aria-label="Reset font size" className="h-7 w-7 p-0 text-sm hover:bg-white">A</Button>
+      <Button type="button" size="sm" variant="ghost" onClick={() => apply(size + 1)} aria-label="Increase font size" className="h-7 w-7 p-0 text-base hover:bg-white">A</Button>
     </div>
   );
 }

@@ -10,12 +10,27 @@ export default function StatsSummary({ insights }: StatsSummaryProps) {
   const total = biases + context + corrections + narratives;
 
   return (
-    <div className="grid grid-cols-2 gap-2 text-center text-xs">
-      <div className="bg-white border border-[#a2a9b1] rounded p-2"><div className="font-semibold text-base">{biases}</div><div>Biases</div></div>
-      <div className="bg-white border border-[#a2a9b1] rounded p-2"><div className="font-semibold text-base">{context}</div><div>Context</div></div>
-      <div className="bg-white border border-[#a2a9b1] rounded p-2"><div className="font-semibold text-base">{corrections}</div><div>Corrections</div></div>
-      <div className="bg-white border border-[#a2a9b1] rounded p-2"><div className="font-semibold text-base">{narratives}</div><div>Narratives</div></div>
-      <div className="col-span-2 bg-[#eaecf0] border border-[#a2a9b1] rounded p-2 mt-1"><div className="font-semibold">{total}</div><div>Total insights</div></div>
+    <div className="grid grid-cols-2 gap-2 text-xs">
+      <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
+        <div className="font-bold text-2xl text-[#d33] mb-1">{biases}</div>
+        <div className="text-[#54595d] font-medium">Biases</div>
+      </div>
+      <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
+        <div className="font-bold text-2xl text-[#0645ad] mb-1">{context}</div>
+        <div className="text-[#54595d] font-medium">Context</div>
+      </div>
+      <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
+        <div className="font-bold text-2xl text-[#b8860b] mb-1">{corrections}</div>
+        <div className="text-[#54595d] font-medium">Corrections</div>
+      </div>
+      <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
+        <div className="font-bold text-2xl text-[#f60] mb-1">{narratives}</div>
+        <div className="text-[#54595d] font-medium">Narratives</div>
+      </div>
+      <div className="col-span-2 bg-[#f8f9fa] border border-[#a2a9b1] rounded p-3 mt-1 text-center hover:shadow-sm transition-shadow">
+        <div className="font-bold text-2xl text-[#202122] mb-1">{total}</div>
+        <div className="text-[#54595d] font-medium">Total insights</div>
+      </div>
     </div>
   );
 }

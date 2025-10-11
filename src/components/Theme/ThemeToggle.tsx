@@ -22,8 +22,8 @@ export default function ThemeToggle() {
   };
 
   return (
-    <Button type="button" variant="outline" size="sm" onClick={toggle} aria-label="Toggle dark mode">
-      {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    <Button type="button" variant="ghost" size="sm" onClick={toggle} aria-label="Toggle dark mode" className="h-8 w-8 p-0 hover:bg-white">
+      {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
     </Button>
   );
 }

@@ -13,8 +13,8 @@ export default function ShareButton({ url, view }: { url: string; view?: string 
     } catch {}
   };
   return (
-    <Button type="button" variant="outline" size="sm" onClick={onShare} aria-label="Copy share link">
-      <Share2 className="h-3 w-3" />
+    <Button type="button" variant="ghost" size="sm" onClick={onShare} aria-label="Copy share link" className="h-8 w-8 p-0 border border-[#a2a9b1] bg-[#f8f9fa] hover:bg-white">
+      <Share2 className="h-3.5 w-3.5" />
       <span className="sr-only">Copy share link</span>
     </Button>
   );

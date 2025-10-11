@@ -1,7 +1,7 @@
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { diffWords } from "diff";
 import { useEffect, useMemo, useState } from "react";
-import { createClient } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 
 interface DiffViewProps {
   originalUrl: string;
@@ -28,7 +28,6 @@ export default function DiffView({ originalUrl, rewrittenMarkdown }: DiffViewPro
       setIsLoading(true);
       try {
         // First, try to get from our cache (which has the scraped content)
-        const supabase = createClient();
         const { data: cached } = await supabase
           .from('article_cache')
           .select('original_content')

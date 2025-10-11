@@ -34,8 +34,8 @@ export default function BookmarkButton({ url }: { url: string }) {
   const label = existing ? 'Remove bookmark' : 'Add bookmark';
 
   return (
-    <Button type="button" variant="outline" size="sm" onClick={toggle} aria-label={label} title={label}>
-      <Icon className="h-3 w-3" />
+    <Button type="button" variant="ghost" size="sm" onClick={toggle} aria-label={label} title={label} className="h-8 w-8 p-0 border border-[#a2a9b1] bg-[#f8f9fa] hover:bg-white">
+      <Icon className="h-3.5 w-3.5" />
       <span className="sr-only">{label}</span>
     </Button>
   );
