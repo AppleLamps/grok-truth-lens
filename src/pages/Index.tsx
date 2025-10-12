@@ -74,7 +74,7 @@ const Index = () => {
   const articleRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [showCompare, setShowCompare] = useState(false);
-  const [filters, setFilters] = useState<InsightType[]>(["biases_removed","context_added","corrections","narratives_challenged"]);
+  const [filters, setFilters] = useState<InsightType[]>(["biases_removed", "context_added", "corrections", "narratives_challenged"]);
   const [openInsightDialog, setOpenInsightDialog] = useState<string | null>(null);
   const { recordArticle } = useLocalAnalytics();
   const [funFacts, setFunFacts] = useState<string[]>([]);
@@ -117,11 +117,11 @@ const Index = () => {
       title: decodeURIComponent(title),
       timestamp: Date.now(),
     };
-    
+
     // Remove duplicate URLs
     const filtered = searchHistory.filter(item => item.url !== searchUrl);
     const updated = [newItem, ...filtered].slice(0, 50); // Keep last 50 searches
-    
+
     setSearchHistory(updated);
     localStorage.setItem('grokipedia-search-history', JSON.stringify(updated));
   };
@@ -154,7 +154,7 @@ const Index = () => {
     try {
       // Create a clone of the article for PDF generation
       const element = articleRef.current.cloneNode(true) as HTMLElement;
-      
+
       // Create a temporary container
       const tempContainer = document.createElement('div');
       tempContainer.style.position = 'absolute';
@@ -322,7 +322,7 @@ const Index = () => {
       }
 
       const contentType = response.headers.get('content-type');
-      
+
       // Handle cached response (JSON)
       if (contentType?.includes('application/json')) {
         const data = await response.json();
@@ -336,7 +336,7 @@ const Index = () => {
         setEtaSeconds(0);
         setIsLoading(false);
         addToSearchHistory(url);
-        
+
         // Record analytics
         recordArticle({
           biases: data.insights?.biases_removed?.length || 0,
@@ -344,7 +344,7 @@ const Index = () => {
           corrections: data.insights?.corrections?.length || 0,
           narratives: data.insights?.narratives_challenged?.length || 0,
         });
-        
+
         toast.success("Article loaded from cache!");
         return;
       }
@@ -402,7 +402,7 @@ const Index = () => {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        
+
         const lines = buffer.split('\n\n');
         buffer = lines.pop() || '';
 
@@ -417,13 +417,13 @@ const Index = () => {
               setIsLoading(false);
               addToSearchHistory(url);
               toast.success("Article rewritten successfully!");
-              
+
               // Parse final accumulated JSON
               try {
                 const fullResult = JSON.parse(accumulatedJson);
                 setRewrittenContent(fullResult.rewritten_article || partialArticle);
                 setInsights(fullResult.insights);
-                
+
                 // Record analytics
                 recordArticle({
                   biases: fullResult.insights?.biases_removed?.length || 0,
@@ -442,7 +442,7 @@ const Index = () => {
               const parsed = JSON.parse(data);
               if (parsed.content) {
                 accumulatedJson += parsed.content;
-                
+
                 // Try to extract article text from partial JSON
                 // Look for "rewritten_article":"..." pattern
                 const articleMatch = accumulatedJson.match(/"rewritten_article"\s*:\s*"((?:[^"\\]|\\.)*)"/);
@@ -455,13 +455,13 @@ const Index = () => {
                     // If unescape fails, keep previous partial
                   }
                 }
-                
+
                 // Try to extract and update insights progressively
                 const partialInsights = extractPartialInsights(accumulatedJson);
                 if (partialInsights) {
                   setInsights(partialInsights);
                 }
-                
+
                 // Update progress metrics
                 setPhase((p) => (p === 'analyzing' ? 'rewriting' : p));
                 const now = performance.now();
@@ -593,7 +593,7 @@ const Index = () => {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const hours = Math.floor(diff / (1000 * 60 * 60));
-    
+
     if (hours < 1) {
       const minutes = Math.floor(diff / (1000 * 60));
       return minutes < 1 ? 'Just now' : `${minutes}m ago`;
@@ -603,6 +603,75 @@ const Index = () => {
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
   };
+
+  // Master list of trending articles
+  const TRENDING_ARTICLES = [
+    { title: "Elon Musk", url: "https://en.wikipedia.org/wiki/Elon_Musk", desc: "Tech entrepreneur and innovator" },
+    { title: "World War II", url: "https://en.wikipedia.org/wiki/World_War_II", desc: "Global conflict from 1939-1945" },
+    { title: "Quantum Computing", url: "https://en.wikipedia.org/wiki/Quantum_computing", desc: "Revolutionary computing paradigm" },
+    { title: "Albert Einstein", url: "https://en.wikipedia.org/wiki/Albert_Einstein", desc: "Theoretical physicist and genius" },
+    { title: "Artificial Intelligence", url: "https://en.wikipedia.org/wiki/Artificial_intelligence", desc: "Machine intelligence and learning" },
+    { title: "Climate Change", url: "https://en.wikipedia.org/wiki/Climate_change", desc: "Long-term environmental shifts" },
+    { title: "Donald Trump", url: "https://en.wikipedia.org/wiki/Donald_Trump", desc: "45th President of United States" },
+    { title: "Bitcoin", url: "https://en.wikipedia.org/wiki/Bitcoin", desc: "Decentralized digital currency" },
+    { title: "COVID-19 Pandemic", url: "https://en.wikipedia.org/wiki/COVID-19_pandemic", desc: "Global health crisis 2019-present" },
+    { title: "SpaceX", url: "https://en.wikipedia.org/wiki/SpaceX", desc: "Private aerospace manufacturer" },
+    { title: "ChatGPT", url: "https://en.wikipedia.org/wiki/ChatGPT", desc: "AI-powered chatbot by OpenAI" },
+    { title: "Ukraine", url: "https://en.wikipedia.org/wiki/Ukraine", desc: "Eastern European country" },
+    { title: "Joe Biden", url: "https://en.wikipedia.org/wiki/Joe_Biden", desc: "46th President of United States" },
+    { title: "Tesla, Inc.", url: "https://en.wikipedia.org/wiki/Tesla,_Inc.", desc: "Electric vehicle manufacturer" },
+    { title: "Nikola Tesla", url: "https://en.wikipedia.org/wiki/Nikola_Tesla", desc: "Inventor and electrical engineer" },
+    { title: "Steve Jobs", url: "https://en.wikipedia.org/wiki/Steve_Jobs", desc: "Co-founder of Apple Inc." },
+    { title: "Barack Obama", url: "https://en.wikipedia.org/wiki/Barack_Obama", desc: "44th President of United States" },
+    { title: "Nuclear Power", url: "https://en.wikipedia.org/wiki/Nuclear_power", desc: "Energy from nuclear reactions" },
+    { title: "Israel", url: "https://en.wikipedia.org/wiki/Israel", desc: "Middle Eastern country" },
+    { title: "Mars", url: "https://en.wikipedia.org/wiki/Mars", desc: "The Red Planet" },
+    { title: "Machine Learning", url: "https://en.wikipedia.org/wiki/Machine_learning", desc: "AI subset focused on learning" },
+    { title: "Cryptocurrency", url: "https://en.wikipedia.org/wiki/Cryptocurrency", desc: "Digital or virtual currency" },
+    { title: "Napoleon Bonaparte", url: "https://en.wikipedia.org/wiki/Napoleon", desc: "French military leader and emperor" },
+    { title: "The Roman Empire", url: "https://en.wikipedia.org/wiki/Roman_Empire", desc: "Ancient civilization and state" },
+    { title: "Winston Churchill", url: "https://en.wikipedia.org/wiki/Winston_Churchill", desc: "British Prime Minister during WWII" },
+    { title: "Blockchain", url: "https://en.wikipedia.org/wiki/Blockchain", desc: "Distributed ledger technology" },
+    { title: "CRISPR", url: "https://en.wikipedia.org/wiki/CRISPR", desc: "Gene editing technology" },
+    { title: "Geoffrey Hinton", url: "https://en.wikipedia.org/wiki/Geoffrey_Hinton", desc: "Pioneer of deep learning" },
+    { title: "OpenAI", url: "https://en.wikipedia.org/wiki/OpenAI", desc: "AI research organization" },
+    { title: "The Manhattan Project", url: "https://en.wikipedia.org/wiki/Manhattan_Project", desc: "WWII atomic bomb development" },
+    { title: "Vladimir Putin", url: "https://en.wikipedia.org/wiki/Vladimir_Putin", desc: "President of Russia" },
+    { title: "Mark Zuckerberg", url: "https://en.wikipedia.org/wiki/Mark_Zuckerberg", desc: "Co-founder of Facebook/Meta" },
+    { title: "Neuralink", url: "https://en.wikipedia.org/wiki/Neuralink", desc: "Brain-computer interface company" },
+    { title: "The Cold War", url: "https://en.wikipedia.org/wiki/Cold_War", desc: "Post-WWII geopolitical tension" },
+    { title: "Alexander the Great", url: "https://en.wikipedia.org/wiki/Alexander_the_Great", desc: "Ancient Macedonian king" },
+    { title: "9/11 Attacks", url: "https://en.wikipedia.org/wiki/September_11_attacks", desc: "2001 terrorist attacks in US" },
+    { title: "Renewable Energy", url: "https://en.wikipedia.org/wiki/Renewable_energy", desc: "Sustainable power sources" },
+    { title: "The Great Depression", url: "https://en.wikipedia.org/wiki/Great_Depression", desc: "1930s worldwide economic crisis" },
+    { title: "Jeff Bezos", url: "https://en.wikipedia.org/wiki/Jeff_Bezos", desc: "Founder of Amazon" },
+    { title: "Neural Networks", url: "https://en.wikipedia.org/wiki/Neural_network", desc: "Computing systems inspired by brains" },
+    { title: "The Vietnam War", url: "https://en.wikipedia.org/wiki/Vietnam_War", desc: "1955-1975 conflict in Southeast Asia" },
+    { title: "Bill Gates", url: "https://en.wikipedia.org/wiki/Bill_Gates", desc: "Co-founder of Microsoft" },
+    { title: "Palestine", url: "https://en.wikipedia.org/wiki/State_of_Palestine", desc: "Middle Eastern territory" },
+    { title: "Inflation", url: "https://en.wikipedia.org/wiki/Inflation", desc: "Rising prices and currency devaluation" },
+    { title: "5G Technology", url: "https://en.wikipedia.org/wiki/5G", desc: "Fifth generation wireless technology" },
+    { title: "Genghis Khan", url: "https://en.wikipedia.org/wiki/Genghis_Khan", desc: "Founder of Mongol Empire" },
+    { title: "Free Speech", url: "https://en.wikipedia.org/wiki/Freedom_of_speech", desc: "Right to express opinions freely" },
+    { title: "The French Revolution", url: "https://en.wikipedia.org/wiki/French_Revolution", desc: "1789 political upheaval in France" },
+    { title: "Stephen Hawking", url: "https://en.wikipedia.org/wiki/Stephen_Hawking", desc: "Theoretical physicist and cosmologist" },
+    { title: "Facebook", url: "https://en.wikipedia.org/wiki/Facebook", desc: "Social media platform" },
+    { title: "Julian Assange", url: "https://en.wikipedia.org/wiki/Julian_Assange", desc: "WikiLeaks founder and activist" },
+    { title: "Edward Snowden", url: "https://en.wikipedia.org/wiki/Edward_Snowden", desc: "NSA whistleblower" },
+    { title: "Galileo Galilei", url: "https://en.wikipedia.org/wiki/Galileo_Galilei", desc: "Astronomer and physicist" },
+    { title: "China", url: "https://en.wikipedia.org/wiki/China", desc: "Most populous country" },
+    { title: "Ray Kurzweil", url: "https://en.wikipedia.org/wiki/Ray_Kurzweil", desc: "Futurist and inventor" },
+    { title: "The Moon Landing", url: "https://en.wikipedia.org/wiki/Apollo_11", desc: "1969 first human moon mission" },
+    { title: "Deep Learning", url: "https://en.wikipedia.org/wiki/Deep_learning", desc: "Advanced machine learning methods" },
+    { title: "Silicon Valley", url: "https://en.wikipedia.org/wiki/Silicon_Valley", desc: "Tech industry hub in California" },
+    { title: "Censorship", url: "https://en.wikipedia.org/wiki/Censorship", desc: "Suppression of speech or information" },
+  ];
+
+  // Randomly select 6 unique trending articles
+  const getRandomTrendingArticles = useMemo(() => {
+    const shuffled = [...TRENDING_ARTICLES].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 6);
+  }, []); // Empty dependency array ensures new selection on each page load
 
   return (
     <SidebarProvider defaultOpen={false}>
@@ -889,7 +958,7 @@ const Index = () => {
                 <SidebarTrigger className="h-8 w-8" />
                 <div className="flex-1 text-center">
                   <div className="inline-block">
-                    <h1 
+                    <h1
                       onClick={() => {
                         setShowResults(false);
                         setRewrittenContent("");
@@ -922,14 +991,17 @@ const Index = () => {
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
                       by{" "}
-                      <a 
-                        href="https://x.com/lamps_apple" 
-                        target="_blank" 
+                      <a
+                        href="https://x.com/lamps_apple"
+                        target="_blank"
                         rel="noopener noreferrer"
                         className="text-[#0645ad] hover:underline font-medium"
                       >
                         @lamps_apple
                       </a>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Powered by Grok 4 Fast
                     </p>
                   </div>
                 </div>
@@ -938,471 +1010,467 @@ const Index = () => {
             </div>
           </header>
 
-      {/* Search Section */}
-      <div className="border-b border-border bg-background">
-        <div className="mx-auto max-w-4xl px-4 py-8">
-          <form ref={formRef} onSubmit={handleSubmit}>
-            <div className="flex gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#72777d]" />
-                <Input
-                  type="url"
-                  placeholder="Enter Wikipedia URL (e.g., https://en.wikipedia.org/wiki/...)"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  className="h-12 pl-10 pr-4 border-[#a2a9b1] bg-white text-[#202122] placeholder:text-[#72777d] focus:border-[#0645ad] focus:ring-2 focus:ring-[#0645ad]/20 transition-all shadow-sm"
-                  disabled={isLoading}
-                />
-              </div>
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="h-12 px-8 bg-[#0645ad] hover:bg-[#0b5cb5] text-white font-medium shadow-md hover:shadow-lg transition-all disabled:opacity-50"
-              >
-                {isLoading ? "Processing..." : "Search"}
-              </Button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      {/* Progressive Loading Indicator */}
-      {isLoading && (
-        <div className="mx-auto max-w-4xl px-4 py-2">
-          <ProcessingProgress
-            phase={phase}
-            percent={percent}
-            etaSeconds={etaSeconds}
-            message={processingStage}
-            funFact={funFacts.length > 0 ? funFacts[currentFactIndex] : undefined}
-          />
-        </div>
-      )}
-
-      {/* Error Message */}
-      {error && (
-        <div className="mx-auto max-w-4xl px-4 py-4">
-          <div className="bg-red-50 border-2 border-red-200 rounded-lg p-5 text-red-800 shadow-md">
-            <div className="flex items-start gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500 flex-shrink-0 mt-0.5">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="8" x2="12" y2="12"></line>
-                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-              </svg>
-              <div>
-                <strong className="font-bold">Error:</strong> <span className="font-medium">{error}</span>
-              </div>
+          {/* Search Section */}
+          <div className="border-b border-border bg-background">
+            <div className="mx-auto max-w-4xl px-4 py-8">
+              <form ref={formRef} onSubmit={handleSubmit}>
+                <div className="flex gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#72777d]" />
+                    <Input
+                      type="url"
+                      placeholder="Enter Wikipedia URL (e.g., https://en.wikipedia.org/wiki/...)"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      className="h-12 pl-10 pr-4 border-[#a2a9b1] bg-white text-[#202122] placeholder:text-[#72777d] focus:border-[#0645ad] focus:ring-2 focus:ring-[#0645ad]/20 transition-all shadow-sm"
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={isLoading}
+                    className="h-12 px-8 bg-[#0645ad] hover:bg-[#0b5cb5] text-white font-medium shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+                  >
+                    {isLoading ? "Processing..." : "Search"}
+                  </Button>
+                </div>
+              </form>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Content Section */}
-      {showResults && !error && (
-        <div className="bg-white">
-          <div className="mx-auto max-w-[1400px] px-4 py-6">
-            <div className="flex flex-col lg:flex-row gap-6 lg:justify-center">
-              {/* Main Article Area */}
-              <article className="w-full lg:max-w-[860px]">
-                {/* Reading progress */}
-                <ReadingProgress targetRef={articleRef as unknown as React.RefObject<HTMLElement>} />
-                {/* Article Header Metadata */}
-                {rewrittenContent && (
-                  <div className="mb-6 pb-4 border-b border-[#a2a9b1] bg-gradient-to-r from-[#f8f9fa]/50 to-transparent rounded-t px-4 py-3 -mx-4 shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 text-xs text-[#54595d]">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10"></circle>
-                          <polyline points="12 6 12 12 16 14"></polyline>
-                        </svg>
-                        <span>Rewritten for clarity and neutrality</span>
-                        <span className="mx-2 hidden sm:inline">•</span>
-                        <a href={url} target="_blank" rel="noopener noreferrer" className="text-[#0645ad] hover:underline hidden sm:inline">
-                          View original article
-                        </a>
-                      </div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div className="flex items-center gap-1 border border-[#a2a9b1] bg-[#f8f9fa] rounded">
-                          <TTSControls targetRef={articleRef as unknown as React.RefObject<HTMLElement>} className="hidden lg:flex" />
-                        </div>
-                        <div className="flex items-center gap-1 border border-[#a2a9b1] bg-[#f8f9fa] rounded">
-                          <FontSizeControls />
-                        </div>
-                        <div className="border border-[#a2a9b1] bg-[#f8f9fa] rounded">
-                          <ThemeToggle />
-                        </div>
-                        <Button type="button" size="sm" variant="ghost" className="h-8 px-3 text-xs border border-[#a2a9b1] bg-[#f8f9fa] hover:bg-white" onClick={() => setShowCompare((v) => !v)} aria-label="Toggle comparison">
-                          <Columns className="h-3.5 w-3.5 mr-1.5" />
-                          <span className="hidden sm:inline">Compare</span>
-                        </Button>
-                        <BookmarkButton url={url} />
-                        <ShareButton url={url} view={showCompare ? 'compare' : undefined} />
-                        <Button
-                        onClick={handleExportPDF}
-                        disabled={isExporting}
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-3 text-xs border border-[#a2a9b1] bg-[#f8f9fa] hover:bg-white disabled:opacity-50"
-                        >
-                          <Download className="h-3.5 w-3.5 mr-1.5" />
-                          <span className="hidden sm:inline">{isExporting ? "Exporting..." : "PDF"}</span>
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {rewrittenContent ? (
-                  <div className="wikipedia-article" ref={articleRef}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {rewrittenContent}
-                    </ReactMarkdown>
-                    
-                    {/* Wikipedia-style footer note */}
-                    <div className="mt-10 pt-6 border-t-2 border-[#a2a9b1]">
-                      <div className="text-sm text-[#54595d] bg-gradient-to-br from-[#f8f9fa] to-[#eaecf0] rounded-lg border border-[#a2a9b1] p-5 shadow-sm">
-                        <div className="flex items-center gap-2 mb-3">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#0645ad]">
-                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-                          </svg>
-                          <p className="font-bold text-[#202122]">About Sources</p>
-                        </div>
-                        <p className="leading-relaxed">
-                          This article has been rewritten for clarity and neutrality. 
-                          To view the original Wikipedia article with all citations and sources, visit:{" "}
-                          <a 
-                            href={url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-[#0645ad] hover:underline font-semibold break-all"
-                          >
-                            {url}
-                          </a>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4 animate-pulse">
-                    <div className="h-8 bg-gray-200 rounded w-3/4"></div>
-                    <div className="space-y-2">
-                      <div className="h-4 bg-gray-200 rounded"></div>
-                      <div className="h-4 bg-gray-200 rounded w-5/6"></div>
-                      <div className="h-4 bg-gray-200 rounded w-4/6"></div>
-                    </div>
-                    <div className="space-y-2 mt-6">
-                      <div className="h-4 bg-gray-200 rounded"></div>
-                      <div className="h-4 bg-gray-200 rounded w-11/12"></div>
-                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                    </div>
-                  </div>
-                )}
-            </article>
+          {/* Progressive Loading Indicator */}
+          {isLoading && (
+            <div className="mx-auto max-w-4xl px-4 py-2">
+              <ProcessingProgress
+                phase={phase}
+                percent={percent}
+                etaSeconds={etaSeconds}
+                message={processingStage}
+                funFact={funFacts.length > 0 ? funFacts[currentFactIndex] : undefined}
+              />
+            </div>
+          )}
 
-            {/* Sidebar - Analysis (hide when comparing) */}
-            {!showCompare && (
-            <aside className="lg:w-[320px] w-full lg:sticky lg:top-4 lg:self-start">
-              <div className="bg-[#f8f9fa] border border-[#a2a9b1] rounded-lg shadow-md overflow-hidden">
-                {/* Table of Contents */}
-                <div className="p-3 border-b border-[#a2a9b1]">
-                  <TableOfContents targetRef={articleRef as unknown as React.RefObject<HTMLElement>} />
+          {/* Error Message */}
+          {error && (
+            <div className="mx-auto max-w-4xl px-4 py-4">
+              <div className="bg-red-50 border-2 border-red-200 rounded-lg p-5 text-red-800 shadow-md">
+                <div className="flex items-start gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500 flex-shrink-0 mt-0.5">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                  </svg>
+                  <div>
+                    <strong className="font-bold">Error:</strong> <span className="font-medium">{error}</span>
+                  </div>
                 </div>
-                
-                {/* Truth Analysis Section */}
-                <div className="bg-gradient-to-r from-[#eaecf0] to-[#f6f6f6] px-4 py-3 border-b border-[#a2a9b1]">
-                  <h3 className="text-sm font-bold text-[#202122] tracking-wide">
-                    Truth Analysis
-                  </h3>
-                </div>
-                <div className="p-3">
-                  {insights ? (
-                    <div className="space-y-4 text-sm">
-                      {/* Compact Stats Summary */}
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
-                          <div className="font-bold text-2xl text-[#d33] mb-1">{(insights?.biases_removed?.length||0)}</div>
-                          <div className="text-[#54595d] text-xs font-medium">Biases</div>
-                        </div>
-                        <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
-                          <div className="font-bold text-2xl text-[#0645ad] mb-1">{(insights?.context_added?.length||0)}</div>
-                          <div className="text-[#54595d] text-xs font-medium">Context</div>
-                        </div>
-                        <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
-                          <div className="font-bold text-2xl text-[#b8860b] mb-1">{(insights?.corrections?.length||0)}</div>
-                          <div className="text-[#54595d] text-xs font-medium">Corrections</div>
-                        </div>
-                        <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
-                          <div className="font-bold text-2xl text-[#f60] mb-1">{(insights?.narratives_challenged?.length||0)}</div>
-                          <div className="text-[#54595d] text-xs font-medium">Narratives</div>
+              </div>
+            </div>
+          )}
+
+          {/* Content Section */}
+          {showResults && !error && (
+            <div className="bg-white">
+              <div className="mx-auto max-w-[1400px] px-4 py-6">
+                <div className="flex flex-col lg:flex-row gap-6 lg:justify-center">
+                  {/* Main Article Area */}
+                  <article className="w-full lg:max-w-[860px]">
+                    {/* Reading progress */}
+                    <ReadingProgress targetRef={articleRef as unknown as React.RefObject<HTMLElement>} />
+                    {/* Article Header Metadata */}
+                    {rewrittenContent && (
+                      <div className="mb-6 pb-4 border-b border-[#a2a9b1] bg-gradient-to-r from-[#f8f9fa]/50 to-transparent rounded-t px-4 py-3 -mx-4 shadow-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 text-xs text-[#54595d]">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10"></circle>
+                              <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                            <span>Rewritten for clarity and neutrality</span>
+                            <span className="mx-2 hidden sm:inline">•</span>
+                            <a href={url} target="_blank" rel="noopener noreferrer" className="text-[#0645ad] hover:underline hidden sm:inline">
+                              View original article
+                            </a>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-1 border border-[#a2a9b1] bg-[#f8f9fa] rounded">
+                              <TTSControls targetRef={articleRef as unknown as React.RefObject<HTMLElement>} className="hidden lg:flex" />
+                            </div>
+                            <div className="flex items-center gap-1 border border-[#a2a9b1] bg-[#f8f9fa] rounded">
+                              <FontSizeControls />
+                            </div>
+                            <div className="border border-[#a2a9b1] bg-[#f8f9fa] rounded">
+                              <ThemeToggle />
+                            </div>
+                            <Button type="button" size="sm" variant="ghost" className="h-8 px-3 text-xs border border-[#a2a9b1] bg-[#f8f9fa] hover:bg-white" onClick={() => setShowCompare((v) => !v)} aria-label="Toggle comparison">
+                              <Columns className="h-3.5 w-3.5 mr-1.5" />
+                              <span className="hidden sm:inline">Compare</span>
+                            </Button>
+                            <BookmarkButton url={url} />
+                            <ShareButton url={url} view={showCompare ? 'compare' : undefined} />
+                            <Button
+                              onClick={handleExportPDF}
+                              disabled={isExporting}
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-3 text-xs border border-[#a2a9b1] bg-[#f8f9fa] hover:bg-white disabled:opacity-50"
+                            >
+                              <Download className="h-3.5 w-3.5 mr-1.5" />
+                              <span className="hidden sm:inline">{isExporting ? "Exporting..." : "PDF"}</span>
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                      
-                      {/* Filter Controls */}
-                      <div className="pt-2">
-                        <InsightsFilter value={filters} onChange={setFilters} />
+                    )}
+                    {rewrittenContent ? (
+                      <div className="wikipedia-article" ref={articleRef}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {rewrittenContent}
+                        </ReactMarkdown>
+
+                        {/* Wikipedia-style footer note */}
+                        <div className="mt-10 pt-6 border-t-2 border-[#a2a9b1]">
+                          <div className="text-sm text-[#54595d] bg-gradient-to-br from-[#f8f9fa] to-[#eaecf0] rounded-lg border border-[#a2a9b1] p-5 shadow-sm">
+                            <div className="flex items-center gap-2 mb-3">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#0645ad]">
+                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                              </svg>
+                              <p className="font-bold text-[#202122]">About Sources</p>
+                            </div>
+                            <p className="leading-relaxed">
+                              This article has been rewritten for clarity and neutrality.
+                              To view the original Wikipedia article with all citations and sources, visit:{" "}
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[#0645ad] hover:underline font-semibold break-all"
+                              >
+                                {url}
+                              </a>
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                      
-                      {/* Compact Lists */}
-                      <div className="space-y-3">
-                        {/* Biases Removed */}
-                        {filters.includes('biases_removed') && (
-                          <div className="border-l-2 border-[#d33] pl-2">
-                            <button
-                              onClick={() => insights.biases_removed && insights.biases_removed.length > 0 && setOpenInsightDialog('biases_removed')}
-                              className={`w-full text-left group ${insights.biases_removed && insights.biases_removed.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
-                            >
-                              <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
-                                Biases Removed
-                                {insights.biases_removed && insights.biases_removed.length > 5 && (
-                                  <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
-                                )}
-                              </h4>
-                            </button>
-                            {insights.biases_removed && insights.biases_removed.length > 0 ? (
-                              <ul className="space-y-1 text-xs text-[#54595d]">
-                                {insights.biases_removed.slice(0, 5).map((bias: string, i: number) => (
-                                  <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
-                                    <span className="text-[#d33] flex-shrink-0">•</span>
-                                    <span className="leading-snug">{bias}</span>
-                                  </li>
-                                ))}
-                                {insights.biases_removed.length > 5 && (
-                                  <li className="text-[#54595d] italic">+{insights.biases_removed.length - 5} more...</li>
-                                )}
-                              </ul>
-                            ) : isLoading ? (
-                              <div className="space-y-1.5">
-                                {[1, 2, 3].map((i) => (
-                                  <div key={i} className="flex gap-1.5 animate-pulse">
-                                    <span className="text-[#d33] flex-shrink-0">•</span>
-                                    <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="text-xs text-[#72777d] italic">None detected</p>
-                            )}
-                          </div>
-                        )}
-                        
-                        {/* Context Added */}
-                        {filters.includes('context_added') && (
-                          <div className="border-l-2 border-[#0645ad] pl-2">
-                            <button
-                              onClick={() => insights.context_added && insights.context_added.length > 0 && setOpenInsightDialog('context_added')}
-                              className={`w-full text-left group ${insights.context_added && insights.context_added.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
-                            >
-                              <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
-                                Context Added
-                                {insights.context_added && insights.context_added.length > 5 && (
-                                  <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
-                                )}
-                              </h4>
-                            </button>
-                            {insights.context_added && insights.context_added.length > 0 ? (
-                              <ul className="space-y-1 text-xs text-[#54595d]">
-                                {insights.context_added.slice(0, 5).map((context: string, i: number) => (
-                                  <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
-                                    <span className="text-[#0645ad] flex-shrink-0">•</span>
-                                    <span className="leading-snug">{context}</span>
-                                  </li>
-                                ))}
-                                {insights.context_added.length > 5 && (
-                                  <li className="text-[#54595d] italic">+{insights.context_added.length - 5} more...</li>
-                                )}
-                              </ul>
-                            ) : isLoading ? (
-                              <div className="space-y-1.5">
-                                {[1, 2, 3].map((i) => (
-                                  <div key={i} className="flex gap-1.5 animate-pulse">
-                                    <span className="text-[#0645ad] flex-shrink-0">•</span>
-                                    <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="text-xs text-[#72777d] italic">None added</p>
-                            )}
-                          </div>
-                        )}
-                        
-                        {/* Corrections Made */}
-                        {filters.includes('corrections') && (
-                          <div className="border-l-2 border-[#b8860b] pl-2">
-                            <button
-                              onClick={() => insights.corrections && insights.corrections.length > 0 && setOpenInsightDialog('corrections')}
-                              className={`w-full text-left group ${insights.corrections && insights.corrections.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
-                            >
-                              <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
-                                Corrections Made
-                                {insights.corrections && insights.corrections.length > 5 && (
-                                  <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
-                                )}
-                              </h4>
-                            </button>
-                            {insights.corrections && insights.corrections.length > 0 ? (
-                              <ul className="space-y-1 text-xs text-[#54595d]">
-                                {insights.corrections.slice(0, 5).map((correction: string, i: number) => (
-                                  <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
-                                    <span className="text-[#b8860b] flex-shrink-0">•</span>
-                                    <span className="leading-snug">{correction}</span>
-                                  </li>
-                                ))}
-                                {insights.corrections.length > 5 && (
-                                  <li className="text-[#54595d] italic">+{insights.corrections.length - 5} more...</li>
-                                )}
-                              </ul>
-                            ) : isLoading ? (
-                              <div className="space-y-1.5">
-                                {[1, 2, 3].map((i) => (
-                                  <div key={i} className="flex gap-1.5 animate-pulse">
-                                    <span className="text-[#b8860b] flex-shrink-0">•</span>
-                                    <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="text-xs text-[#72777d] italic">None made</p>
-                            )}
-                          </div>
-                        )}
-                        
-                        {/* Narratives Challenged */}
-                        {filters.includes('narratives_challenged') && (
-                          <div className="border-l-2 border-[#f60] pl-2">
-                            <button
-                              onClick={() => insights.narratives_challenged && insights.narratives_challenged.length > 0 && setOpenInsightDialog('narratives_challenged')}
-                              className={`w-full text-left group ${insights.narratives_challenged && insights.narratives_challenged.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
-                            >
-                              <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
-                                Narratives Challenged
-                                {insights.narratives_challenged && insights.narratives_challenged.length > 5 && (
-                                  <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
-                                )}
-                              </h4>
-                            </button>
-                            {insights.narratives_challenged && insights.narratives_challenged.length > 0 ? (
-                              <ul className="space-y-1 text-xs text-[#54595d]">
-                                {insights.narratives_challenged.slice(0, 5).map((narrative: string, i: number) => (
-                                  <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
-                                    <span className="text-[#f60] flex-shrink-0">•</span>
-                                    <span className="leading-snug">{narrative}</span>
-                                  </li>
-                                ))}
-                                {insights.narratives_challenged.length > 5 && (
-                                  <li className="text-[#54595d] italic">+{insights.narratives_challenged.length - 5} more...</li>
-                                )}
-                              </ul>
-                            ) : isLoading ? (
-                              <div className="space-y-1.5">
-                                {[1, 2, 3].map((i) => (
-                                  <div key={i} className="flex gap-1.5 animate-pulse">
-                                    <span className="text-[#f60] flex-shrink-0">•</span>
-                                    <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="text-xs text-[#72777d] italic">None challenged</p>
-                            )}
-                          </div>
-                        )}
+                    ) : (
+                      <div className="space-y-4 animate-pulse">
+                        <div className="h-8 bg-gray-200 rounded w-3/4"></div>
+                        <div className="space-y-2">
+                          <div className="h-4 bg-gray-200 rounded"></div>
+                          <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+                          <div className="h-4 bg-gray-200 rounded w-4/6"></div>
+                        </div>
+                        <div className="space-y-2 mt-6">
+                          <div className="h-4 bg-gray-200 rounded"></div>
+                          <div className="h-4 bg-gray-200 rounded w-11/12"></div>
+                          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="text-muted-foreground italic text-xs py-4 text-center">
-                      Analyzing content...
+                    )}
+                  </article>
+
+                  {/* Sidebar - Analysis (hide when comparing) */}
+                  {!showCompare && (
+                    <aside className="lg:w-[320px] w-full lg:sticky lg:top-4 lg:self-start">
+                      <div className="bg-[#f8f9fa] border border-[#a2a9b1] rounded-lg shadow-md overflow-hidden">
+                        {/* Table of Contents */}
+                        <div className="p-3 border-b border-[#a2a9b1]">
+                          <TableOfContents targetRef={articleRef as unknown as React.RefObject<HTMLElement>} />
+                        </div>
+
+                        {/* Truth Analysis Section */}
+                        <div className="bg-gradient-to-r from-[#eaecf0] to-[#f6f6f6] px-4 py-3 border-b border-[#a2a9b1]">
+                          <h3 className="text-sm font-bold text-[#202122] tracking-wide">
+                            Truth Analysis
+                          </h3>
+                        </div>
+                        <div className="p-3">
+                          {insights ? (
+                            <div className="space-y-4 text-sm">
+                              {/* Compact Stats Summary */}
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
+                                  <div className="font-bold text-2xl text-[#d33] mb-1">{(insights?.biases_removed?.length || 0)}</div>
+                                  <div className="text-[#54595d] text-xs font-medium">Biases</div>
+                                </div>
+                                <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
+                                  <div className="font-bold text-2xl text-[#0645ad] mb-1">{(insights?.context_added?.length || 0)}</div>
+                                  <div className="text-[#54595d] text-xs font-medium">Context</div>
+                                </div>
+                                <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
+                                  <div className="font-bold text-2xl text-[#b8860b] mb-1">{(insights?.corrections?.length || 0)}</div>
+                                  <div className="text-[#54595d] text-xs font-medium">Corrections</div>
+                                </div>
+                                <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
+                                  <div className="font-bold text-2xl text-[#f60] mb-1">{(insights?.narratives_challenged?.length || 0)}</div>
+                                  <div className="text-[#54595d] text-xs font-medium">Narratives</div>
+                                </div>
+                              </div>
+
+                              {/* Filter Controls */}
+                              <div className="pt-2">
+                                <InsightsFilter value={filters} onChange={setFilters} />
+                              </div>
+
+                              {/* Compact Lists */}
+                              <div className="space-y-3">
+                                {/* Biases Removed */}
+                                {filters.includes('biases_removed') && (
+                                  <div className="border-l-2 border-[#d33] pl-2">
+                                    <button
+                                      onClick={() => insights.biases_removed && insights.biases_removed.length > 0 && setOpenInsightDialog('biases_removed')}
+                                      className={`w-full text-left group ${insights.biases_removed && insights.biases_removed.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
+                                    >
+                                      <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
+                                        Biases Removed
+                                        {insights.biases_removed && insights.biases_removed.length > 5 && (
+                                          <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
+                                        )}
+                                      </h4>
+                                    </button>
+                                    {insights.biases_removed && insights.biases_removed.length > 0 ? (
+                                      <ul className="space-y-1 text-xs text-[#54595d]">
+                                        {insights.biases_removed.slice(0, 5).map((bias: string, i: number) => (
+                                          <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
+                                            <span className="text-[#d33] flex-shrink-0">•</span>
+                                            <span className="leading-snug">{bias}</span>
+                                          </li>
+                                        ))}
+                                        {insights.biases_removed.length > 5 && (
+                                          <li className="text-[#54595d] italic">+{insights.biases_removed.length - 5} more...</li>
+                                        )}
+                                      </ul>
+                                    ) : isLoading ? (
+                                      <div className="space-y-1.5">
+                                        {[1, 2, 3].map((i) => (
+                                          <div key={i} className="flex gap-1.5 animate-pulse">
+                                            <span className="text-[#d33] flex-shrink-0">•</span>
+                                            <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="text-xs text-[#72777d] italic">None detected</p>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Context Added */}
+                                {filters.includes('context_added') && (
+                                  <div className="border-l-2 border-[#0645ad] pl-2">
+                                    <button
+                                      onClick={() => insights.context_added && insights.context_added.length > 0 && setOpenInsightDialog('context_added')}
+                                      className={`w-full text-left group ${insights.context_added && insights.context_added.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
+                                    >
+                                      <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
+                                        Context Added
+                                        {insights.context_added && insights.context_added.length > 5 && (
+                                          <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
+                                        )}
+                                      </h4>
+                                    </button>
+                                    {insights.context_added && insights.context_added.length > 0 ? (
+                                      <ul className="space-y-1 text-xs text-[#54595d]">
+                                        {insights.context_added.slice(0, 5).map((context: string, i: number) => (
+                                          <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
+                                            <span className="text-[#0645ad] flex-shrink-0">•</span>
+                                            <span className="leading-snug">{context}</span>
+                                          </li>
+                                        ))}
+                                        {insights.context_added.length > 5 && (
+                                          <li className="text-[#54595d] italic">+{insights.context_added.length - 5} more...</li>
+                                        )}
+                                      </ul>
+                                    ) : isLoading ? (
+                                      <div className="space-y-1.5">
+                                        {[1, 2, 3].map((i) => (
+                                          <div key={i} className="flex gap-1.5 animate-pulse">
+                                            <span className="text-[#0645ad] flex-shrink-0">•</span>
+                                            <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="text-xs text-[#72777d] italic">None added</p>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Corrections Made */}
+                                {filters.includes('corrections') && (
+                                  <div className="border-l-2 border-[#b8860b] pl-2">
+                                    <button
+                                      onClick={() => insights.corrections && insights.corrections.length > 0 && setOpenInsightDialog('corrections')}
+                                      className={`w-full text-left group ${insights.corrections && insights.corrections.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
+                                    >
+                                      <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
+                                        Corrections Made
+                                        {insights.corrections && insights.corrections.length > 5 && (
+                                          <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
+                                        )}
+                                      </h4>
+                                    </button>
+                                    {insights.corrections && insights.corrections.length > 0 ? (
+                                      <ul className="space-y-1 text-xs text-[#54595d]">
+                                        {insights.corrections.slice(0, 5).map((correction: string, i: number) => (
+                                          <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
+                                            <span className="text-[#b8860b] flex-shrink-0">•</span>
+                                            <span className="leading-snug">{correction}</span>
+                                          </li>
+                                        ))}
+                                        {insights.corrections.length > 5 && (
+                                          <li className="text-[#54595d] italic">+{insights.corrections.length - 5} more...</li>
+                                        )}
+                                      </ul>
+                                    ) : isLoading ? (
+                                      <div className="space-y-1.5">
+                                        {[1, 2, 3].map((i) => (
+                                          <div key={i} className="flex gap-1.5 animate-pulse">
+                                            <span className="text-[#b8860b] flex-shrink-0">•</span>
+                                            <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="text-xs text-[#72777d] italic">None made</p>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Narratives Challenged */}
+                                {filters.includes('narratives_challenged') && (
+                                  <div className="border-l-2 border-[#f60] pl-2">
+                                    <button
+                                      onClick={() => insights.narratives_challenged && insights.narratives_challenged.length > 0 && setOpenInsightDialog('narratives_challenged')}
+                                      className={`w-full text-left group ${insights.narratives_challenged && insights.narratives_challenged.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
+                                    >
+                                      <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
+                                        Narratives Challenged
+                                        {insights.narratives_challenged && insights.narratives_challenged.length > 5 && (
+                                          <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
+                                        )}
+                                      </h4>
+                                    </button>
+                                    {insights.narratives_challenged && insights.narratives_challenged.length > 0 ? (
+                                      <ul className="space-y-1 text-xs text-[#54595d]">
+                                        {insights.narratives_challenged.slice(0, 5).map((narrative: string, i: number) => (
+                                          <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
+                                            <span className="text-[#f60] flex-shrink-0">•</span>
+                                            <span className="leading-snug">{narrative}</span>
+                                          </li>
+                                        ))}
+                                        {insights.narratives_challenged.length > 5 && (
+                                          <li className="text-[#54595d] italic">+{insights.narratives_challenged.length - 5} more...</li>
+                                        )}
+                                      </ul>
+                                    ) : isLoading ? (
+                                      <div className="space-y-1.5">
+                                        {[1, 2, 3].map((i) => (
+                                          <div key={i} className="flex gap-1.5 animate-pulse">
+                                            <span className="text-[#f60] flex-shrink-0">•</span>
+                                            <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="text-xs text-[#72777d] italic">None challenged</p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-muted-foreground italic text-xs py-4 text-center">
+                              Analyzing content...
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </aside>
+                  )}
+
+                  {/* Compare View */}
+                  {showCompare && (
+                    <div className="flex-1">
+                      <DiffView originalUrl={url} rewrittenMarkdown={rewrittenContent} />
                     </div>
                   )}
                 </div>
               </div>
-            </aside>
-            )}
-            
-            {/* Compare View */}
-            {showCompare && (
-              <div className="flex-1">
-                <DiffView originalUrl={url} rewrittenMarkdown={rewrittenContent} />
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-      )}
+            </div>
+          )}
 
-      {/* Empty State */}
-      {!showResults && !error && (
-        <div className="mx-auto max-w-4xl px-4 py-24">
-          <div className="text-center space-y-8">
-            <div className="inline-flex items-center justify-center w-28 h-28 rounded-full bg-gradient-to-br from-[#f8f9fa] to-[#eaecf0] border-2 border-[#a2a9b1] shadow-sm">
-              <svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#54595d]">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              </svg>
-            </div>
-            <div className="space-y-3">
-              <h2 className="text-3xl font-serif font-bold text-[#202122]">
-                Search for Truth
-              </h2>
-              <p className="text-[#54595d] text-lg max-w-xl mx-auto leading-relaxed">
-                Enter any Wikipedia article URL to see it rewritten with bias removed
-                and context added for a more balanced perspective.
-              </p>
-            </div>
-            <div className="text-sm text-[#54595d] bg-gradient-to-br from-[#f8f9fa] to-white border border-[#a2a9b1] rounded-lg p-5 max-w-xl mx-auto shadow-sm hover:shadow-md transition-shadow">
-              <p className="font-semibold mb-2 text-[#202122]">Example:</p>
-              <code className="text-[#0645ad] bg-white px-3 py-1.5 rounded border border-[#c8ccd1] inline-block font-mono text-xs">https://en.wikipedia.org/wiki/Elon_Musk</code>
-            </div>
+          {/* Empty State */}
+          {!showResults && !error && (
+            <div className="mx-auto max-w-4xl px-4 py-24">
+              <div className="text-center space-y-8">
+                <div className="inline-flex items-center justify-center w-28 h-28 rounded-full bg-gradient-to-br from-[#f8f9fa] to-[#eaecf0] border-2 border-[#a2a9b1] shadow-sm">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#54595d]">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                </div>
+                <div className="space-y-3">
+                  <h2 className="text-3xl font-serif font-bold text-[#202122]">
+                    Search for Truth
+                  </h2>
+                  <p className="text-sm text-[#54595d] font-medium">
+                    Powered by Grok 4 Fast
+                  </p>
+                  <p className="text-[#54595d] text-lg max-w-xl mx-auto leading-relaxed">
+                    Enter any Wikipedia article URL to see it rewritten with bias removed
+                    and context added for a more balanced perspective.
+                  </p>
+                </div>
+                <div className="text-sm text-[#54595d] bg-gradient-to-br from-[#f8f9fa] to-white border border-[#a2a9b1] rounded-lg p-5 max-w-xl mx-auto shadow-sm hover:shadow-md transition-shadow">
+                  <p className="font-semibold mb-2 text-[#202122]">Example:</p>
+                  <code className="text-[#0645ad] bg-white px-3 py-1.5 rounded border border-[#c8ccd1] inline-block font-mono text-xs">https://en.wikipedia.org/wiki/Elon_Musk</code>
+                </div>
 
-            {/* Trending Articles Section */}
-            <div className="mt-12 pt-8 border-t border-[#a2a9b1]">
-              <h3 className="text-2xl font-serif font-bold text-[#202122] mb-6">
-                Trending on Grokipedia
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
-                {[
-                  { title: "Elon Musk", url: "https://en.wikipedia.org/wiki/Elon_Musk", desc: "Tech entrepreneur and innovator" },
-                  { title: "World War II", url: "https://en.wikipedia.org/wiki/World_War_II", desc: "Global conflict from 1939-1945" },
-                  { title: "Quantum Computing", url: "https://en.wikipedia.org/wiki/Quantum_computing", desc: "Revolutionary computing paradigm" },
-                  { title: "Albert Einstein", url: "https://en.wikipedia.org/wiki/Albert_Einstein", desc: "Theoretical physicist and genius" },
-                  { title: "Artificial Intelligence", url: "https://en.wikipedia.org/wiki/Artificial_intelligence", desc: "Machine intelligence and learning" },
-                  { title: "Climate Change", url: "https://en.wikipedia.org/wiki/Climate_change", desc: "Long-term environmental shifts" },
-                ].map((article) => (
-                  <button
-                    key={article.url}
-                    onClick={() => {
-                      setUrl(article.url);
-                      setTimeout(() => {
-                        if (formRef.current) {
-                          formRef.current.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-                        }
-                      }, 100);
-                    }}
-                    className="group text-left p-4 bg-white border border-[#c8ccd1] rounded-lg hover:border-[#0645ad] hover:shadow-lg transition-all duration-200"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 mt-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#0645ad] group-hover:scale-110 transition-transform">
-                          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-                        </svg>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-sm text-[#202122] group-hover:text-[#0645ad] transition-colors mb-1">
-                          {article.title}
-                        </h4>
-                        <p className="text-xs text-[#54595d] leading-relaxed">
-                          {article.desc}
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                ))}
+                {/* Trending Articles Section */}
+                <div className="mt-12 pt-8 border-t border-[#a2a9b1]">
+                  <h3 className="text-2xl font-serif font-bold text-[#202122] mb-6">
+                    Trending on Grokipedia
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
+                    {getRandomTrendingArticles.map((article) => (
+                      <button
+                        key={article.url}
+                        onClick={() => {
+                          setUrl(article.url);
+                          setTimeout(() => {
+                            if (formRef.current) {
+                              formRef.current.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+                            }
+                          }, 100);
+                        }}
+                        className="group text-left p-4 bg-white border border-[#c8ccd1] rounded-lg hover:border-[#0645ad] hover:shadow-lg transition-all duration-200"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 mt-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#0645ad] group-hover:scale-110 transition-transform">
+                              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-sm text-[#202122] group-hover:text-[#0645ad] transition-colors mb-1">
+                              {article.title}
+                            </h4>
+                            <p className="text-xs text-[#54595d] leading-relaxed">
+                              {article.desc}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
           {/* Back to Top Button */}
           {showBackToTop && (

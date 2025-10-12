@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Bookmark, Trash2, ExternalLink, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import ConfirmationDialog from "@/components/ui/ConfirmationDialog";
 
 interface BookmarkItem {
   id: string;
@@ -28,6 +29,7 @@ function saveBookmarks(items: BookmarkItem[]) {
 
 const Bookmarks = () => {
   const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([]);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -41,12 +43,14 @@ const Bookmarks = () => {
     toast.success("Bookmark removed");
   };
 
-  const clearAllBookmarks = () => {
-    if (window.confirm('Are you sure you want to clear all bookmarks?')) {
-      setBookmarks([]);
-      localStorage.removeItem(KEY);
-      toast.success("All bookmarks cleared");
-    }
+  const handleClearAll = () => {
+    setConfirmDialogOpen(true);
+  };
+
+  const confirmClearAll = () => {
+    setBookmarks([]);
+    localStorage.removeItem(KEY);
+    toast.success("All bookmarks cleared");
   };
 
   const loadArticle = (url: string) => {
@@ -145,7 +149,7 @@ const Bookmarks = () => {
           </div>
           {bookmarks.length > 0 && (
             <Button
-              onClick={clearAllBookmarks}
+              onClick={handleClearAll}
               variant="ghost"
               size="sm"
               className="text-[#d33] hover:text-[#d33] hover:bg-red-50"
@@ -485,6 +489,13 @@ const Bookmarks = () => {
           </div>
         )}
       </div>
+      <ConfirmationDialog
+        open={confirmDialogOpen}
+        onOpenChange={setConfirmDialogOpen}
+        onConfirm={confirmClearAll}
+        title="Clear All Bookmarks?"
+        description="Are you sure you want to clear all bookmarks? This action cannot be undone."
+      />
     </div>
   );
 };
