@@ -10,6 +10,7 @@ export interface ProcessingProgressProps {
   etaSeconds: number | null; // remaining seconds, null when unknown
   message?: string;
   className?: string;
+  funFact?: string;
 }
 
 const PHASES: { key: Phase; label: string }[] = [
@@ -19,7 +20,7 @@ const PHASES: { key: Phase; label: string }[] = [
   { key: "finalizing", label: "Finalizing" },
 ];
 
-export function ProcessingProgress({ phase, percent, etaSeconds, message, className }: ProcessingProgressProps) {
+export function ProcessingProgress({ phase, percent, etaSeconds, message, className, funFact }: ProcessingProgressProps) {
   const formattedEta = useMemo(() => {
     if (etaSeconds == null || !isFinite(etaSeconds) || etaSeconds < 0) return null;
     const s = Math.ceil(etaSeconds);
@@ -63,6 +64,28 @@ export function ProcessingProgress({ phase, percent, etaSeconds, message, classN
 
       {message && (
         <div className="mt-2 text-xs text-[#54595d]" aria-live="polite">{message}</div>
+      )}
+
+      {funFact && (
+        <div className="mt-4 pt-4 border-t border-[#a2a9b1]">
+          <div className="flex items-start gap-3 p-3 bg-gradient-to-br from-[#fff9e6] to-[#fffbf0] border border-[#f0c000] rounded-lg shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="flex-shrink-0 mt-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#f0c000]">
+                <path d="M9 18h6"></path>
+                <path d="M10 22h4"></path>
+                <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path>
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-semibold text-[#a67c00] uppercase tracking-wider mb-1.5">
+                Did You Know?
+              </div>
+              <p className="text-sm text-[#54595d] leading-relaxed" aria-live="polite">
+                {funFact}
+              </p>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

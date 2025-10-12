@@ -77,6 +77,8 @@ const Index = () => {
   const [filters, setFilters] = useState<InsightType[]>(["biases_removed","context_added","corrections","narratives_challenged"]);
   const [openInsightDialog, setOpenInsightDialog] = useState<string | null>(null);
   const { recordArticle } = useLocalAnalytics();
+  const [funFacts, setFunFacts] = useState<string[]>([]);
+  const [currentFactIndex, setCurrentFactIndex] = useState<number>(0);
 
   // Load search history from localStorage on mount
   useEffect(() => {
@@ -243,6 +245,10 @@ const Index = () => {
       return;
     }
 
+    // Reset fun facts state
+    setFunFacts([]);
+    setCurrentFactIndex(0);
+
     setIsLoading(true);
     setShowResults(true);
     setRewrittenContent("");
@@ -257,8 +263,31 @@ const Index = () => {
     speedWindowRef.current = [];
 
     try {
+      // Fetch fun facts asynchronously (don't block main process)
+      fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fun-facts`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ url }),
+        }
+      )
+        .then(response => response.json())
+        .then(data => {
+          if (data.fun_facts && Array.isArray(data.fun_facts)) {
+            setFunFacts(data.fun_facts);
+          }
+        })
+        .catch(error => {
+          console.error('Failed to fetch fun facts:', error);
+          // Silently fail - fun facts are nice to have, not critical
+        });
+
       toast.info("Processing Wikipedia article...");
-      
+
       // Preload Wikipedia summary to estimate size for ETA
       try {
         const title = url.split('/wiki/')[1];
@@ -508,6 +537,19 @@ const Index = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Fun facts rotation
+  useEffect(() => {
+    if (isLoading && funFacts.length > 0) {
+      const interval = setInterval(() => {
+        setCurrentFactIndex((prevIndex) => {
+          return (prevIndex + 1) % funFacts.length;
+        });
+      }, 6000); // Rotate every 6 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [isLoading, funFacts.length]);
 
   // Group search history by time periods
   const groupedHistory = useMemo(() => {
@@ -932,6 +974,7 @@ const Index = () => {
             percent={percent}
             etaSeconds={etaSeconds}
             message={processingStage}
+            funFact={funFacts.length > 0 ? funFacts[currentFactIndex] : undefined}
           />
         </div>
       )}
