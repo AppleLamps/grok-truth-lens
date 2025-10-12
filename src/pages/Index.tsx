@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Search, Download, History, Trash2, Columns } from "lucide-react";
+import { Search, Download, History, Trash2, Columns, Bookmark } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import jsPDF from 'jspdf';
@@ -22,6 +23,13 @@ import {
   SidebarGroupLabel,
   SidebarGroupContent,
 } from "@/components/ui/sidebar";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ProcessingProgress from "@/components/Loading/ProcessingProgress";
 import ReadingProgress from "@/components/Article/ReadingProgress";
@@ -44,6 +52,7 @@ interface SearchHistoryItem {
 }
 
 const Index = () => {
+  const navigate = useNavigate();
   const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
@@ -66,6 +75,7 @@ const Index = () => {
   const formRef = useRef<HTMLFormElement>(null);
   const [showCompare, setShowCompare] = useState(false);
   const [filters, setFilters] = useState<InsightType[]>(["biases_removed","context_added","corrections","narratives_challenged"]);
+  const [openInsightDialog, setOpenInsightDialog] = useState<string | null>(null);
   const { recordArticle } = useLocalAnalytics();
 
   // Load search history from localStorage on mount
@@ -199,9 +209,37 @@ const Index = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!url.includes("wikipedia.org")) {
-      toast.error("Please enter a valid Wikipedia URL");
+
+    // Enhanced URL validation
+    try {
+      const urlObj = new URL(url);
+
+      // Check if it's a Wikipedia URL
+      if (!urlObj.hostname.includes("wikipedia.org")) {
+        toast.error("Please enter a valid Wikipedia URL");
+        return;
+      }
+
+      // Check if it's specifically English Wikipedia
+      if (urlObj.hostname !== "en.wikipedia.org") {
+        toast.error("Only English Wikipedia articles are supported (en.wikipedia.org)");
+        return;
+      }
+
+      // Check if it's an article page (contains /wiki/)
+      if (!urlObj.pathname.startsWith("/wiki/")) {
+        toast.error("Please enter a Wikipedia article URL (e.g., https://en.wikipedia.org/wiki/...)");
+        return;
+      }
+
+      // Check if it's not a special Wikipedia page
+      const specialPages = ["/wiki/Special:", "/wiki/Wikipedia:", "/wiki/Help:", "/wiki/Template:", "/wiki/Category:", "/wiki/Portal:", "/wiki/File:"];
+      if (specialPages.some(page => urlObj.pathname.startsWith(page))) {
+        toast.error("Please enter a Wikipedia article URL, not a special page");
+        return;
+      }
+    } catch (error) {
+      toast.error("Please enter a valid URL");
       return;
     }
 
@@ -535,17 +573,28 @@ const Index = () => {
               </div>
               <h2 className="font-bold text-base text-[#202122] tracking-tight">Search History</h2>
             </div>
-            {searchHistory.length > 0 && (
+            <div className="flex items-center gap-2">
               <Button
-                onClick={clearAllHistory}
+                onClick={() => navigate('/bookmarks')}
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 text-xs text-[#d33] hover:text-[#d33] hover:bg-red-50"
-                title="Clear all history"
+                className="h-7 w-7 p-0 text-[#0645ad] hover:text-[#0645ad] hover:bg-blue-50"
+                title="View bookmarks"
               >
-                Clear All
+                <Bookmark className="h-4 w-4" />
               </Button>
-            )}
+              {searchHistory.length > 0 && (
+                <Button
+                  onClick={clearAllHistory}
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-[#d33] hover:text-[#d33] hover:bg-red-50"
+                  title="Clear all history"
+                >
+                  Clear All
+                </Button>
+              )}
+            </div>
           </div>
         </SidebarHeader>
         <SidebarContent className="bg-gradient-to-b from-white to-[#f8f9fa]">
@@ -1055,7 +1104,17 @@ const Index = () => {
                         {/* Biases Removed */}
                         {filters.includes('biases_removed') && (
                           <div className="border-l-2 border-[#d33] pl-2">
-                            <h4 className="font-semibold text-xs mb-1.5 text-[#202122]">Biases Removed</h4>
+                            <button
+                              onClick={() => insights.biases_removed && insights.biases_removed.length > 0 && setOpenInsightDialog('biases_removed')}
+                              className={`w-full text-left group ${insights.biases_removed && insights.biases_removed.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
+                            >
+                              <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
+                                Biases Removed
+                                {insights.biases_removed && insights.biases_removed.length > 5 && (
+                                  <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
+                                )}
+                              </h4>
+                            </button>
                             {insights.biases_removed && insights.biases_removed.length > 0 ? (
                               <ul className="space-y-1 text-xs text-[#54595d]">
                                 {insights.biases_removed.slice(0, 5).map((bias: string, i: number) => (
@@ -1086,7 +1145,17 @@ const Index = () => {
                         {/* Context Added */}
                         {filters.includes('context_added') && (
                           <div className="border-l-2 border-[#0645ad] pl-2">
-                            <h4 className="font-semibold text-xs mb-1.5 text-[#202122]">Context Added</h4>
+                            <button
+                              onClick={() => insights.context_added && insights.context_added.length > 0 && setOpenInsightDialog('context_added')}
+                              className={`w-full text-left group ${insights.context_added && insights.context_added.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
+                            >
+                              <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
+                                Context Added
+                                {insights.context_added && insights.context_added.length > 5 && (
+                                  <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
+                                )}
+                              </h4>
+                            </button>
                             {insights.context_added && insights.context_added.length > 0 ? (
                               <ul className="space-y-1 text-xs text-[#54595d]">
                                 {insights.context_added.slice(0, 5).map((context: string, i: number) => (
@@ -1117,7 +1186,17 @@ const Index = () => {
                         {/* Corrections Made */}
                         {filters.includes('corrections') && (
                           <div className="border-l-2 border-[#b8860b] pl-2">
-                            <h4 className="font-semibold text-xs mb-1.5 text-[#202122]">Corrections Made</h4>
+                            <button
+                              onClick={() => insights.corrections && insights.corrections.length > 0 && setOpenInsightDialog('corrections')}
+                              className={`w-full text-left group ${insights.corrections && insights.corrections.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
+                            >
+                              <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
+                                Corrections Made
+                                {insights.corrections && insights.corrections.length > 5 && (
+                                  <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
+                                )}
+                              </h4>
+                            </button>
                             {insights.corrections && insights.corrections.length > 0 ? (
                               <ul className="space-y-1 text-xs text-[#54595d]">
                                 {insights.corrections.slice(0, 5).map((correction: string, i: number) => (
@@ -1148,7 +1227,17 @@ const Index = () => {
                         {/* Narratives Challenged */}
                         {filters.includes('narratives_challenged') && (
                           <div className="border-l-2 border-[#f60] pl-2">
-                            <h4 className="font-semibold text-xs mb-1.5 text-[#202122]">Narratives Challenged</h4>
+                            <button
+                              onClick={() => insights.narratives_challenged && insights.narratives_challenged.length > 0 && setOpenInsightDialog('narratives_challenged')}
+                              className={`w-full text-left group ${insights.narratives_challenged && insights.narratives_challenged.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
+                            >
+                              <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
+                                Narratives Challenged
+                                {insights.narratives_challenged && insights.narratives_challenged.length > 5 && (
+                                  <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
+                                )}
+                              </h4>
+                            </button>
                             {insights.narratives_challenged && insights.narratives_challenged.length > 0 ? (
                               <ul className="space-y-1 text-xs text-[#54595d]">
                                 {insights.narratives_challenged.slice(0, 5).map((narrative: string, i: number) => (
@@ -1213,13 +1302,60 @@ const Index = () => {
                 Search for Truth
               </h2>
               <p className="text-[#54595d] text-lg max-w-xl mx-auto leading-relaxed">
-                Enter any Wikipedia article URL to see it rewritten with bias removed 
+                Enter any Wikipedia article URL to see it rewritten with bias removed
                 and context added for a more balanced perspective.
               </p>
             </div>
             <div className="text-sm text-[#54595d] bg-gradient-to-br from-[#f8f9fa] to-white border border-[#a2a9b1] rounded-lg p-5 max-w-xl mx-auto shadow-sm hover:shadow-md transition-shadow">
               <p className="font-semibold mb-2 text-[#202122]">Example:</p>
               <code className="text-[#0645ad] bg-white px-3 py-1.5 rounded border border-[#c8ccd1] inline-block font-mono text-xs">https://en.wikipedia.org/wiki/Elon_Musk</code>
+            </div>
+
+            {/* Trending Articles Section */}
+            <div className="mt-12 pt-8 border-t border-[#a2a9b1]">
+              <h3 className="text-2xl font-serif font-bold text-[#202122] mb-6">
+                Trending on Grokipedia
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
+                {[
+                  { title: "Elon Musk", url: "https://en.wikipedia.org/wiki/Elon_Musk", desc: "Tech entrepreneur and innovator" },
+                  { title: "World War II", url: "https://en.wikipedia.org/wiki/World_War_II", desc: "Global conflict from 1939-1945" },
+                  { title: "Quantum Computing", url: "https://en.wikipedia.org/wiki/Quantum_computing", desc: "Revolutionary computing paradigm" },
+                  { title: "Albert Einstein", url: "https://en.wikipedia.org/wiki/Albert_Einstein", desc: "Theoretical physicist and genius" },
+                  { title: "Artificial Intelligence", url: "https://en.wikipedia.org/wiki/Artificial_intelligence", desc: "Machine intelligence and learning" },
+                  { title: "Climate Change", url: "https://en.wikipedia.org/wiki/Climate_change", desc: "Long-term environmental shifts" },
+                ].map((article) => (
+                  <button
+                    key={article.url}
+                    onClick={() => {
+                      setUrl(article.url);
+                      setTimeout(() => {
+                        if (formRef.current) {
+                          formRef.current.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+                        }
+                      }, 100);
+                    }}
+                    className="group text-left p-4 bg-white border border-[#c8ccd1] rounded-lg hover:border-[#0645ad] hover:shadow-lg transition-all duration-200"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 mt-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#0645ad] group-hover:scale-110 transition-transform">
+                          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-sm text-[#202122] group-hover:text-[#0645ad] transition-colors mb-1">
+                          {article.title}
+                        </h4>
+                        <p className="text-xs text-[#54595d] leading-relaxed">
+                          {article.desc}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -1238,6 +1374,103 @@ const Index = () => {
               </svg>
             </button>
           )}
+
+          {/* Insight Dialogs */}
+          <Dialog open={openInsightDialog === 'biases_removed'} onOpenChange={() => setOpenInsightDialog(null)}>
+            <DialogContent className="max-w-2xl max-h-[80vh] bg-white border-2 border-[#a2a9b1]">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold text-[#d33] flex items-center gap-2">
+                  <span className="inline-block w-1 h-6 bg-[#d33] rounded"></span>
+                  Biases Removed
+                </DialogTitle>
+                <DialogDescription className="text-[#54595d]">
+                  Complete list of biased language and framing that was identified and corrected.
+                </DialogDescription>
+              </DialogHeader>
+              <ScrollArea className="max-h-[60vh] pr-4">
+                <ul className="space-y-3 text-sm text-[#202122]">
+                  {insights?.biases_removed?.map((bias: string, i: number) => (
+                    <li key={i} className="flex gap-3 p-3 bg-[#f8f9fa] rounded border border-[#c8ccd1]">
+                      <span className="text-[#d33] font-bold flex-shrink-0">{i + 1}.</span>
+                      <span className="leading-relaxed">{bias}</span>
+                    </li>
+                  ))}
+                </ul>
+              </ScrollArea>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={openInsightDialog === 'context_added'} onOpenChange={() => setOpenInsightDialog(null)}>
+            <DialogContent className="max-w-2xl max-h-[80vh] bg-white border-2 border-[#a2a9b1]">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold text-[#0645ad] flex items-center gap-2">
+                  <span className="inline-block w-1 h-6 bg-[#0645ad] rounded"></span>
+                  Context Added
+                </DialogTitle>
+                <DialogDescription className="text-[#54595d]">
+                  Complete list of critical context that was added to provide a fuller picture.
+                </DialogDescription>
+              </DialogHeader>
+              <ScrollArea className="max-h-[60vh] pr-4">
+                <ul className="space-y-3 text-sm text-[#202122]">
+                  {insights?.context_added?.map((context: string, i: number) => (
+                    <li key={i} className="flex gap-3 p-3 bg-[#f8f9fa] rounded border border-[#c8ccd1]">
+                      <span className="text-[#0645ad] font-bold flex-shrink-0">{i + 1}.</span>
+                      <span className="leading-relaxed">{context}</span>
+                    </li>
+                  ))}
+                </ul>
+              </ScrollArea>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={openInsightDialog === 'corrections'} onOpenChange={() => setOpenInsightDialog(null)}>
+            <DialogContent className="max-w-2xl max-h-[80vh] bg-white border-2 border-[#a2a9b1]">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold text-[#b8860b] flex items-center gap-2">
+                  <span className="inline-block w-1 h-6 bg-[#b8860b] rounded"></span>
+                  Corrections Made
+                </DialogTitle>
+                <DialogDescription className="text-[#54595d]">
+                  Complete list of factual inaccuracies and errors that were corrected.
+                </DialogDescription>
+              </DialogHeader>
+              <ScrollArea className="max-h-[60vh] pr-4">
+                <ul className="space-y-3 text-sm text-[#202122]">
+                  {insights?.corrections?.map((correction: string, i: number) => (
+                    <li key={i} className="flex gap-3 p-3 bg-[#f8f9fa] rounded border border-[#c8ccd1]">
+                      <span className="text-[#b8860b] font-bold flex-shrink-0">{i + 1}.</span>
+                      <span className="leading-relaxed">{correction}</span>
+                    </li>
+                  ))}
+                </ul>
+              </ScrollArea>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={openInsightDialog === 'narratives_challenged'} onOpenChange={() => setOpenInsightDialog(null)}>
+            <DialogContent className="max-w-2xl max-h-[80vh] bg-white border-2 border-[#a2a9b1]">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold text-[#f60] flex items-center gap-2">
+                  <span className="inline-block w-1 h-6 bg-[#f60] rounded"></span>
+                  Narratives Challenged
+                </DialogTitle>
+                <DialogDescription className="text-[#54595d]">
+                  Complete list of mainstream narratives that were questioned or corrected.
+                </DialogDescription>
+              </DialogHeader>
+              <ScrollArea className="max-h-[60vh] pr-4">
+                <ul className="space-y-3 text-sm text-[#202122]">
+                  {insights?.narratives_challenged?.map((narrative: string, i: number) => (
+                    <li key={i} className="flex gap-3 p-3 bg-[#f8f9fa] rounded border border-[#c8ccd1]">
+                      <span className="text-[#f60] font-bold flex-shrink-0">{i + 1}.</span>
+                      <span className="leading-relaxed">{narrative}</span>
+                    </li>
+                  ))}
+                </ul>
+              </ScrollArea>
+            </DialogContent>
+          </Dialog>
         </div>
       </SidebarInset>
     </SidebarProvider>
