@@ -33,7 +33,7 @@ export default function DiffView({ originalUrl, rewrittenMarkdown }: DiffViewPro
           .select('original_content')
           .eq('wikipedia_url', originalUrl)
           .maybeSingle();
-        
+
         if (cached?.original_content) {
           // Use the scraped markdown content
           setOriginalText(stripMarkdown(cached.original_content));
@@ -47,7 +47,7 @@ export default function DiffView({ originalUrl, rewrittenMarkdown }: DiffViewPro
           setIsLoading(false);
           return;
         }
-        
+
         const summaryResp = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`);
         if (summaryResp.ok) {
           const s = await summaryResp.json();
@@ -70,10 +70,10 @@ export default function DiffView({ originalUrl, rewrittenMarkdown }: DiffViewPro
   }, [originalText, rewrittenMarkdown]);
 
   return (
-    <div className="border border-[#a2a9b1] mt-6">
+    <div className="border border-[#a2a9b1] h-full">
       <PanelGroup direction="horizontal">
         <Panel defaultSize={45} minSize={20}>
-          <div className="h-[70vh] overflow-auto p-4 bg-white">
+          <div className="h-full overflow-auto p-4 bg-white">
             <div className="text-xs font-semibold mb-2">Original</div>
             {isLoading ? (
               <div className="flex items-center gap-2 text-sm text-[#54595d]">
@@ -89,7 +89,7 @@ export default function DiffView({ originalUrl, rewrittenMarkdown }: DiffViewPro
         </Panel>
         <PanelResizeHandle className="w-1 bg-[#a2a9b1]" />
         <Panel minSize={20}>
-          <div className="h-[70vh] overflow-auto p-4 bg-white">
+          <div className="h-full overflow-auto p-4 bg-white">
             <div className="text-xs font-semibold mb-2">Rewritten (inline diff)</div>
             <div className="text-sm leading-6">
               {isLoading ? (

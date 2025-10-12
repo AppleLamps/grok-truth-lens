@@ -40,7 +40,7 @@ import ThemeToggle from "@/components/Theme/ThemeToggle";
 import BookmarkButton from "@/components/Actions/BookmarkButton";
 import ShareButton from "@/components/Actions/ShareButton";
 import usePullToRefresh from "@/hooks/usePullToRefresh";
-import DiffView from "@/components/Compare/DiffView";
+import CompareDialog from "@/components/Compare/CompareDialog";
 import InsightsFilter, { InsightType } from "@/components/Insights/InsightsFilter";
 import useLocalAnalytics from "@/hooks/useLocalAnalytics";
 
@@ -665,6 +665,26 @@ const Index = () => {
     { title: "Deep Learning", url: "https://en.wikipedia.org/wiki/Deep_learning", desc: "Advanced machine learning methods" },
     { title: "Silicon Valley", url: "https://en.wikipedia.org/wiki/Silicon_Valley", desc: "Tech industry hub in California" },
     { title: "Censorship", url: "https://en.wikipedia.org/wiki/Censorship", desc: "Suppression of speech or information" },
+    { title: "Sam Altman", url: "https://en.wikipedia.org/wiki/Sam_Altman", desc: "CEO of OpenAI" },
+    { title: "Quantum Mechanics", url: "https://en.wikipedia.org/wiki/Quantum_mechanics", desc: "Physics of the very small" },
+    { title: "The Internet", url: "https://en.wikipedia.org/wiki/Internet", desc: "Global computer network system" },
+    { title: "Adolf Hitler", url: "https://en.wikipedia.org/wiki/Adolf_Hitler", desc: "Nazi dictator of Germany" },
+    { title: "Abraham Lincoln", url: "https://en.wikipedia.org/wiki/Abraham_Lincoln", desc: "16th President of United States" },
+    { title: "Renaissance", url: "https://en.wikipedia.org/wiki/Renaissance", desc: "European cultural rebirth period" },
+    { title: "Propaganda", url: "https://en.wikipedia.org/wiki/Propaganda", desc: "Biased information persuasion" },
+    { title: "George Orwell", url: "https://en.wikipedia.org/wiki/George_Orwell", desc: "Author of 1984 and Animal Farm" },
+    { title: "The Holocaust", url: "https://en.wikipedia.org/wiki/The_Holocaust", desc: "WWII genocide of European Jews" },
+    { title: "Nikola Jokić", url: "https://en.wikipedia.org/wiki/Nikola_Joki%C4%87", desc: "Serbian NBA basketball player" },
+    { title: "Greta Thunberg", url: "https://en.wikipedia.org/wiki/Greta_Thunberg", desc: "Climate change activist" },
+    { title: "Martin Luther King Jr.", url: "https://en.wikipedia.org/wiki/Martin_Luther_King_Jr.", desc: "Civil rights movement leader" },
+    { title: "Democracy", url: "https://en.wikipedia.org/wiki/Democracy", desc: "Government by the people" },
+    { title: "Socialism", url: "https://en.wikipedia.org/wiki/Socialism", desc: "Economic and political system" },
+    { title: "Capitalism", url: "https://en.wikipedia.org/wiki/Capitalism", desc: "Free market economic system" },
+    { title: "Carbon Footprint", url: "https://en.wikipedia.org/wiki/Carbon_footprint", desc: "Greenhouse gas emissions measure" },
+    { title: "Pfizer", url: "https://en.wikipedia.org/wiki/Pfizer", desc: "American pharmaceutical corporation" },
+    { title: "Moderna", url: "https://en.wikipedia.org/wiki/Moderna", desc: "Biotechnology company" },
+    { title: "Anthony Fauci", url: "https://en.wikipedia.org/wiki/Anthony_Fauci", desc: "American immunologist" },
+    { title: "Conspiracy Theory", url: "https://en.wikipedia.org/wiki/Conspiracy_theory", desc: "Alternative explanations for events" },
   ];
 
   // Randomly select 6 unique trending articles
@@ -1171,232 +1191,223 @@ const Index = () => {
                     )}
                   </article>
 
-                  {/* Sidebar - Analysis (hide when comparing) */}
-                  {!showCompare && (
-                    <aside className="lg:w-[320px] w-full lg:sticky lg:top-4 lg:self-start">
-                      <div className="bg-[#f8f9fa] border border-[#a2a9b1] rounded-lg shadow-md overflow-hidden">
-                        {/* Table of Contents */}
-                        <div className="p-3 border-b border-[#a2a9b1]">
-                          <TableOfContents targetRef={articleRef as unknown as React.RefObject<HTMLElement>} />
-                        </div>
-
-                        {/* Truth Analysis Section */}
-                        <div className="bg-gradient-to-r from-[#eaecf0] to-[#f6f6f6] px-4 py-3 border-b border-[#a2a9b1]">
-                          <h3 className="text-sm font-bold text-[#202122] tracking-wide">
-                            Truth Analysis
-                          </h3>
-                        </div>
-                        <div className="p-3">
-                          {insights ? (
-                            <div className="space-y-4 text-sm">
-                              {/* Compact Stats Summary */}
-                              <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
-                                  <div className="font-bold text-2xl text-[#d33] mb-1">{(insights?.biases_removed?.length || 0)}</div>
-                                  <div className="text-[#54595d] text-xs font-medium">Biases</div>
-                                </div>
-                                <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
-                                  <div className="font-bold text-2xl text-[#0645ad] mb-1">{(insights?.context_added?.length || 0)}</div>
-                                  <div className="text-[#54595d] text-xs font-medium">Context</div>
-                                </div>
-                                <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
-                                  <div className="font-bold text-2xl text-[#b8860b] mb-1">{(insights?.corrections?.length || 0)}</div>
-                                  <div className="text-[#54595d] text-xs font-medium">Corrections</div>
-                                </div>
-                                <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
-                                  <div className="font-bold text-2xl text-[#f60] mb-1">{(insights?.narratives_challenged?.length || 0)}</div>
-                                  <div className="text-[#54595d] text-xs font-medium">Narratives</div>
-                                </div>
-                              </div>
-
-                              {/* Filter Controls */}
-                              <div className="pt-2">
-                                <InsightsFilter value={filters} onChange={setFilters} />
-                              </div>
-
-                              {/* Compact Lists */}
-                              <div className="space-y-3">
-                                {/* Biases Removed */}
-                                {filters.includes('biases_removed') && (
-                                  <div className="border-l-2 border-[#d33] pl-2">
-                                    <button
-                                      onClick={() => insights.biases_removed && insights.biases_removed.length > 0 && setOpenInsightDialog('biases_removed')}
-                                      className={`w-full text-left group ${insights.biases_removed && insights.biases_removed.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
-                                    >
-                                      <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
-                                        Biases Removed
-                                        {insights.biases_removed && insights.biases_removed.length > 5 && (
-                                          <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
-                                        )}
-                                      </h4>
-                                    </button>
-                                    {insights.biases_removed && insights.biases_removed.length > 0 ? (
-                                      <ul className="space-y-1 text-xs text-[#54595d]">
-                                        {insights.biases_removed.slice(0, 5).map((bias: string, i: number) => (
-                                          <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
-                                            <span className="text-[#d33] flex-shrink-0">•</span>
-                                            <span className="leading-snug">{bias}</span>
-                                          </li>
-                                        ))}
-                                        {insights.biases_removed.length > 5 && (
-                                          <li className="text-[#54595d] italic">+{insights.biases_removed.length - 5} more...</li>
-                                        )}
-                                      </ul>
-                                    ) : isLoading ? (
-                                      <div className="space-y-1.5">
-                                        {[1, 2, 3].map((i) => (
-                                          <div key={i} className="flex gap-1.5 animate-pulse">
-                                            <span className="text-[#d33] flex-shrink-0">•</span>
-                                            <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <p className="text-xs text-[#72777d] italic">None detected</p>
-                                    )}
-                                  </div>
-                                )}
-
-                                {/* Context Added */}
-                                {filters.includes('context_added') && (
-                                  <div className="border-l-2 border-[#0645ad] pl-2">
-                                    <button
-                                      onClick={() => insights.context_added && insights.context_added.length > 0 && setOpenInsightDialog('context_added')}
-                                      className={`w-full text-left group ${insights.context_added && insights.context_added.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
-                                    >
-                                      <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
-                                        Context Added
-                                        {insights.context_added && insights.context_added.length > 5 && (
-                                          <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
-                                        )}
-                                      </h4>
-                                    </button>
-                                    {insights.context_added && insights.context_added.length > 0 ? (
-                                      <ul className="space-y-1 text-xs text-[#54595d]">
-                                        {insights.context_added.slice(0, 5).map((context: string, i: number) => (
-                                          <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
-                                            <span className="text-[#0645ad] flex-shrink-0">•</span>
-                                            <span className="leading-snug">{context}</span>
-                                          </li>
-                                        ))}
-                                        {insights.context_added.length > 5 && (
-                                          <li className="text-[#54595d] italic">+{insights.context_added.length - 5} more...</li>
-                                        )}
-                                      </ul>
-                                    ) : isLoading ? (
-                                      <div className="space-y-1.5">
-                                        {[1, 2, 3].map((i) => (
-                                          <div key={i} className="flex gap-1.5 animate-pulse">
-                                            <span className="text-[#0645ad] flex-shrink-0">•</span>
-                                            <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <p className="text-xs text-[#72777d] italic">None added</p>
-                                    )}
-                                  </div>
-                                )}
-
-                                {/* Corrections Made */}
-                                {filters.includes('corrections') && (
-                                  <div className="border-l-2 border-[#b8860b] pl-2">
-                                    <button
-                                      onClick={() => insights.corrections && insights.corrections.length > 0 && setOpenInsightDialog('corrections')}
-                                      className={`w-full text-left group ${insights.corrections && insights.corrections.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
-                                    >
-                                      <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
-                                        Corrections Made
-                                        {insights.corrections && insights.corrections.length > 5 && (
-                                          <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
-                                        )}
-                                      </h4>
-                                    </button>
-                                    {insights.corrections && insights.corrections.length > 0 ? (
-                                      <ul className="space-y-1 text-xs text-[#54595d]">
-                                        {insights.corrections.slice(0, 5).map((correction: string, i: number) => (
-                                          <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
-                                            <span className="text-[#b8860b] flex-shrink-0">•</span>
-                                            <span className="leading-snug">{correction}</span>
-                                          </li>
-                                        ))}
-                                        {insights.corrections.length > 5 && (
-                                          <li className="text-[#54595d] italic">+{insights.corrections.length - 5} more...</li>
-                                        )}
-                                      </ul>
-                                    ) : isLoading ? (
-                                      <div className="space-y-1.5">
-                                        {[1, 2, 3].map((i) => (
-                                          <div key={i} className="flex gap-1.5 animate-pulse">
-                                            <span className="text-[#b8860b] flex-shrink-0">•</span>
-                                            <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <p className="text-xs text-[#72777d] italic">None made</p>
-                                    )}
-                                  </div>
-                                )}
-
-                                {/* Narratives Challenged */}
-                                {filters.includes('narratives_challenged') && (
-                                  <div className="border-l-2 border-[#f60] pl-2">
-                                    <button
-                                      onClick={() => insights.narratives_challenged && insights.narratives_challenged.length > 0 && setOpenInsightDialog('narratives_challenged')}
-                                      className={`w-full text-left group ${insights.narratives_challenged && insights.narratives_challenged.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
-                                    >
-                                      <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
-                                        Narratives Challenged
-                                        {insights.narratives_challenged && insights.narratives_challenged.length > 5 && (
-                                          <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
-                                        )}
-                                      </h4>
-                                    </button>
-                                    {insights.narratives_challenged && insights.narratives_challenged.length > 0 ? (
-                                      <ul className="space-y-1 text-xs text-[#54595d]">
-                                        {insights.narratives_challenged.slice(0, 5).map((narrative: string, i: number) => (
-                                          <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
-                                            <span className="text-[#f60] flex-shrink-0">•</span>
-                                            <span className="leading-snug">{narrative}</span>
-                                          </li>
-                                        ))}
-                                        {insights.narratives_challenged.length > 5 && (
-                                          <li className="text-[#54595d] italic">+{insights.narratives_challenged.length - 5} more...</li>
-                                        )}
-                                      </ul>
-                                    ) : isLoading ? (
-                                      <div className="space-y-1.5">
-                                        {[1, 2, 3].map((i) => (
-                                          <div key={i} className="flex gap-1.5 animate-pulse">
-                                            <span className="text-[#f60] flex-shrink-0">•</span>
-                                            <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <p className="text-xs text-[#72777d] italic">None challenged</p>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="text-muted-foreground italic text-xs py-4 text-center">
-                              Analyzing content...
-                            </div>
-                          )}
-                        </div>
+                  {/* Sidebar - Analysis */}
+                  <aside className="lg:w-[320px] w-full lg:sticky lg:top-4 lg:self-start">
+                    <div className="bg-[#f8f9fa] border border-[#a2a9b1] rounded-lg shadow-md overflow-hidden">
+                      {/* Table of Contents */}
+                      <div className="p-3 border-b border-[#a2a9b1]">
+                        <TableOfContents targetRef={articleRef as unknown as React.RefObject<HTMLElement>} />
                       </div>
-                    </aside>
-                  )}
 
-                  {/* Compare View */}
-                  {showCompare && (
-                    <div className="flex-1">
-                      <DiffView originalUrl={url} rewrittenMarkdown={rewrittenContent} />
+                      {/* Truth Analysis Section */}
+                      <div className="bg-gradient-to-r from-[#eaecf0] to-[#f6f6f6] px-4 py-3 border-b border-[#a2a9b1]">
+                        <h3 className="text-sm font-bold text-[#202122] tracking-wide">
+                          Truth Analysis
+                        </h3>
+                      </div>
+                      <div className="p-3">
+                        {insights ? (
+                          <div className="space-y-4 text-sm">
+                            {/* Compact Stats Summary */}
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
+                                <div className="font-bold text-2xl text-[#d33] mb-1">{(insights?.biases_removed?.length || 0)}</div>
+                                <div className="text-[#54595d] text-xs font-medium">Biases</div>
+                              </div>
+                              <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
+                                <div className="font-bold text-2xl text-[#0645ad] mb-1">{(insights?.context_added?.length || 0)}</div>
+                                <div className="text-[#54595d] text-xs font-medium">Context</div>
+                              </div>
+                              <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
+                                <div className="font-bold text-2xl text-[#b8860b] mb-1">{(insights?.corrections?.length || 0)}</div>
+                                <div className="text-[#54595d] text-xs font-medium">Corrections</div>
+                              </div>
+                              <div className="bg-white border border-[#a2a9b1] rounded p-3 text-center hover:shadow-sm transition-shadow">
+                                <div className="font-bold text-2xl text-[#f60] mb-1">{(insights?.narratives_challenged?.length || 0)}</div>
+                                <div className="text-[#54595d] text-xs font-medium">Narratives</div>
+                              </div>
+                            </div>
+
+                            {/* Filter Controls */}
+                            <div className="pt-2">
+                              <InsightsFilter value={filters} onChange={setFilters} />
+                            </div>
+
+                            {/* Compact Lists */}
+                            <div className="space-y-3">
+                              {/* Biases Removed */}
+                              {filters.includes('biases_removed') && (
+                                <div className="border-l-2 border-[#d33] pl-2">
+                                  <button
+                                    onClick={() => insights.biases_removed && insights.biases_removed.length > 0 && setOpenInsightDialog('biases_removed')}
+                                    className={`w-full text-left group ${insights.biases_removed && insights.biases_removed.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
+                                  >
+                                    <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
+                                      Biases Removed
+                                      {insights.biases_removed && insights.biases_removed.length > 5 && (
+                                        <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
+                                      )}
+                                    </h4>
+                                  </button>
+                                  {insights.biases_removed && insights.biases_removed.length > 0 ? (
+                                    <ul className="space-y-1 text-xs text-[#54595d]">
+                                      {insights.biases_removed.slice(0, 5).map((bias: string, i: number) => (
+                                        <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
+                                          <span className="text-[#d33] flex-shrink-0">•</span>
+                                          <span className="leading-snug">{bias}</span>
+                                        </li>
+                                      ))}
+                                      {insights.biases_removed.length > 5 && (
+                                        <li className="text-[#54595d] italic">+{insights.biases_removed.length - 5} more...</li>
+                                      )}
+                                    </ul>
+                                  ) : isLoading ? (
+                                    <div className="space-y-1.5">
+                                      {[1, 2, 3].map((i) => (
+                                        <div key={i} className="flex gap-1.5 animate-pulse">
+                                          <span className="text-[#d33] flex-shrink-0">•</span>
+                                          <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-[#72777d] italic">None detected</p>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Context Added */}
+                              {filters.includes('context_added') && (
+                                <div className="border-l-2 border-[#0645ad] pl-2">
+                                  <button
+                                    onClick={() => insights.context_added && insights.context_added.length > 0 && setOpenInsightDialog('context_added')}
+                                    className={`w-full text-left group ${insights.context_added && insights.context_added.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
+                                  >
+                                    <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
+                                      Context Added
+                                      {insights.context_added && insights.context_added.length > 5 && (
+                                        <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
+                                      )}
+                                    </h4>
+                                  </button>
+                                  {insights.context_added && insights.context_added.length > 0 ? (
+                                    <ul className="space-y-1 text-xs text-[#54595d]">
+                                      {insights.context_added.slice(0, 5).map((context: string, i: number) => (
+                                        <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
+                                          <span className="text-[#0645ad] flex-shrink-0">•</span>
+                                          <span className="leading-snug">{context}</span>
+                                        </li>
+                                      ))}
+                                      {insights.context_added.length > 5 && (
+                                        <li className="text-[#54595d] italic">+{insights.context_added.length - 5} more...</li>
+                                      )}
+                                    </ul>
+                                  ) : isLoading ? (
+                                    <div className="space-y-1.5">
+                                      {[1, 2, 3].map((i) => (
+                                        <div key={i} className="flex gap-1.5 animate-pulse">
+                                          <span className="text-[#0645ad] flex-shrink-0">•</span>
+                                          <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-[#72777d] italic">None added</p>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Corrections Made */}
+                              {filters.includes('corrections') && (
+                                <div className="border-l-2 border-[#b8860b] pl-2">
+                                  <button
+                                    onClick={() => insights.corrections && insights.corrections.length > 0 && setOpenInsightDialog('corrections')}
+                                    className={`w-full text-left group ${insights.corrections && insights.corrections.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
+                                  >
+                                    <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
+                                      Corrections Made
+                                      {insights.corrections && insights.corrections.length > 5 && (
+                                        <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
+                                      )}
+                                    </h4>
+                                  </button>
+                                  {insights.corrections && insights.corrections.length > 0 ? (
+                                    <ul className="space-y-1 text-xs text-[#54595d]">
+                                      {insights.corrections.slice(0, 5).map((correction: string, i: number) => (
+                                        <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
+                                          <span className="text-[#b8860b] flex-shrink-0">•</span>
+                                          <span className="leading-snug">{correction}</span>
+                                        </li>
+                                      ))}
+                                      {insights.corrections.length > 5 && (
+                                        <li className="text-[#54595d] italic">+{insights.corrections.length - 5} more...</li>
+                                      )}
+                                    </ul>
+                                  ) : isLoading ? (
+                                    <div className="space-y-1.5">
+                                      {[1, 2, 3].map((i) => (
+                                        <div key={i} className="flex gap-1.5 animate-pulse">
+                                          <span className="text-[#b8860b] flex-shrink-0">•</span>
+                                          <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-[#72777d] italic">None made</p>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Narratives Challenged */}
+                              {filters.includes('narratives_challenged') && (
+                                <div className="border-l-2 border-[#f60] pl-2">
+                                  <button
+                                    onClick={() => insights.narratives_challenged && insights.narratives_challenged.length > 0 && setOpenInsightDialog('narratives_challenged')}
+                                    className={`w-full text-left group ${insights.narratives_challenged && insights.narratives_challenged.length > 0 ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
+                                  >
+                                    <h4 className="font-semibold text-xs mb-1.5 text-[#202122] flex items-center justify-between">
+                                      Narratives Challenged
+                                      {insights.narratives_challenged && insights.narratives_challenged.length > 5 && (
+                                        <span className="text-[#0645ad] text-xs font-normal group-hover:underline">View All</span>
+                                      )}
+                                    </h4>
+                                  </button>
+                                  {insights.narratives_challenged && insights.narratives_challenged.length > 0 ? (
+                                    <ul className="space-y-1 text-xs text-[#54595d]">
+                                      {insights.narratives_challenged.slice(0, 5).map((narrative: string, i: number) => (
+                                        <li key={i} className="flex gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
+                                          <span className="text-[#f60] flex-shrink-0">•</span>
+                                          <span className="leading-snug">{narrative}</span>
+                                        </li>
+                                      ))}
+                                      {insights.narratives_challenged.length > 5 && (
+                                        <li className="text-[#54595d] italic">+{insights.narratives_challenged.length - 5} more...</li>
+                                      )}
+                                    </ul>
+                                  ) : isLoading ? (
+                                    <div className="space-y-1.5">
+                                      {[1, 2, 3].map((i) => (
+                                        <div key={i} className="flex gap-1.5 animate-pulse">
+                                          <span className="text-[#f60] flex-shrink-0">•</span>
+                                          <div className="flex-1 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"></div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-[#72777d] italic">None challenged</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-muted-foreground italic text-xs py-4 text-center">
+                            Analyzing content...
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
+                  </aside>
                 </div>
               </div>
             </div>
@@ -1471,6 +1482,14 @@ const Index = () => {
               </div>
             </div>
           )}
+
+          {/* Compare Dialog */}
+          <CompareDialog
+            open={showCompare}
+            onOpenChange={setShowCompare}
+            originalUrl={url}
+            rewrittenMarkdown={rewrittenContent}
+          />
 
           {/* Back to Top Button */}
           {showBackToTop && (
