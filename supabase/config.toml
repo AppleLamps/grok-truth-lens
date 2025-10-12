@@ -2,3 +2,6 @@ project_id = "snxbobehltruwmnitlek"
 
 [functions.rewrite]
 verify_jwt = false
+
+[functions.fun-facts]
+verify_jwt = false
