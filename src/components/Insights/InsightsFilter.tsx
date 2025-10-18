@@ -30,18 +30,18 @@ export default function InsightsFilter({ value, onChange, className }: InsightsF
     <div className={cn("space-y-2", className)} aria-label="Filter insights">
       <div className="grid grid-cols-2 gap-2">
         {OPTIONS.map(o => (
-          <Button 
-            key={o.key} 
-            type="button" 
-            size="sm" 
-            variant="ghost"
-            onClick={() => toggle(o.key)} 
+          <Button
+            key={o.key}
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => toggle(o.key)}
             aria-pressed={value.includes(o.key)}
             className={cn(
-              "h-9 px-3 text-xs font-medium border rounded",
-              value.includes(o.key) 
-                ? "bg-[#0645ad] text-white border-[#0645ad] hover:bg-[#0b5cb5] hover:border-[#0b5cb5]" 
-                : "bg-[#f8f9fa] text-[#202122] border-[#a2a9b1] hover:bg-white"
+              "h-9 px-3 text-xs font-medium border-2 rounded transition-all",
+              value.includes(o.key)
+                ? "bg-white text-[#0645ad] border-[#0645ad] hover:bg-[#f8f9fa] shadow-sm"
+                : "bg-white text-[#54595d] border-[#c8ccd1] hover:border-[#a2a9b1] hover:text-[#202122]"
             )}
           >
             {o.label}
@@ -49,20 +49,20 @@ export default function InsightsFilter({ value, onChange, className }: InsightsF
         ))}
       </div>
       <div className="flex items-center justify-end gap-2">
-        <Button 
-          type="button" 
-          size="sm" 
-          variant="ghost" 
-          onClick={selectAll} 
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={selectAll}
           disabled={allSelected}
           className="h-8 px-3 text-xs border border-[#a2a9b1] bg-[#f8f9fa] hover:bg-white disabled:opacity-40 rounded"
         >
           All
         </Button>
-        <Button 
-          type="button" 
-          size="sm" 
-          variant="ghost" 
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
           onClick={clearAll}
           className="h-8 px-3 text-xs border border-[#a2a9b1] bg-[#f8f9fa] hover:bg-white rounded"
         >

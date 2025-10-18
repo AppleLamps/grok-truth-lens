@@ -1,4 +1,4 @@
-# Grok Truth Lens
+![1760805089083](image/README/1760805089083.png)![1760805090499](image/README/1760805090499.png)![1760805092978](image/README/1760805092978.png)![1760805145037](image/README/1760805145037.png)![1760805189777](image/README/1760805189777.png)# Grok Truth Lens
 
 A truth-seeking application that reanalyzes Wikipedia articles to identify and remove biases, add missing context, and challenge misleading narratives. Powered by Grok 4 Fast AI, this tool provides a more balanced perspective on topics by examining articles through a lens of radical objectivity and first-principles analysis.
 

@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
-import { useMemo } from "react";
+import { useMemo, memo } from "react";
 
 type Phase = "fetching" | "analyzing" | "rewriting" | "finalizing";
 
@@ -20,7 +20,7 @@ const PHASES: { key: Phase; label: string }[] = [
   { key: "finalizing", label: "Finalizing" },
 ];
 
-export function ProcessingProgress({ phase, percent, etaSeconds, message, className, funFact }: ProcessingProgressProps) {
+const ProcessingProgressComponent = ({ phase, percent, etaSeconds, message, className, funFact }: ProcessingProgressProps) => {
   const formattedEta = useMemo(() => {
     if (etaSeconds == null || !isFinite(etaSeconds) || etaSeconds < 0) return null;
     const s = Math.ceil(etaSeconds);
@@ -54,7 +54,7 @@ export function ProcessingProgress({ phase, percent, etaSeconds, message, classN
           const isCompleted = PHASES.findIndex(ph => ph.key === phase) > idx;
           return (
             <div key={p.key} className={cn("flex items-center gap-1 text-xs px-2 py-1 rounded border", isActive && "bg-white border-[#a2a9b1]", !isActive && !isCompleted && "opacity-70 border-transparent", isCompleted && "bg-white border-[#a2a9b1]")}
-                 aria-current={isActive ? "step" : undefined}>
+              aria-current={isActive ? "step" : undefined}>
               <span className={cn("inline-flex h-2 w-2 rounded-full", isCompleted && "bg-[#0645ad]", isActive && "bg-[#0645ad] animate-pulse", !isActive && !isCompleted && "bg-[#a2a9b1]")}></span>
               <span>{p.label}</span>
             </div>
@@ -89,8 +89,11 @@ export function ProcessingProgress({ phase, percent, etaSeconds, message, classN
       )}
     </div>
   );
-}
+};
 
+ProcessingProgressComponent.displayName = "ProcessingProgress";
+
+export const ProcessingProgress = memo(ProcessingProgressComponent);
 export default ProcessingProgress;
 
 

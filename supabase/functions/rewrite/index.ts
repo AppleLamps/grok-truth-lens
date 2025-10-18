@@ -57,7 +57,7 @@ async function scrapeWikipediaContent(url: string): Promise<string> {
   }
 
   console.log('Scraping content with Firecrawl:', url);
-  
+
   const response = await fetch('https://api.firecrawl.dev/v2/scrape', {
     method: 'POST',
     headers: {
@@ -79,7 +79,7 @@ async function scrapeWikipediaContent(url: string): Promise<string> {
   }
 
   const data = await response.json();
-  
+
   if (!data.success || !data.data?.markdown) {
     throw new Error('No content found in scrape response');
   }
@@ -95,9 +95,9 @@ serve(async (req) => {
 
   try {
     const { url } = await req.json();
-    
+
     console.log('Processing Wikipedia URL:', url);
-    
+
     // Validate Wikipedia URL
     if (!url || !url.includes('wikipedia.org')) {
       return new Response(
@@ -149,11 +149,11 @@ serve(async (req) => {
         'X-Title': 'Grokipedia',
       },
       body: JSON.stringify({
-        model: 'x-ai/grok-4-fast',
-        max_tokens: 1800000,
+        model: 'x-ai/grok-code-fast-1',
+        max_tokens: 256000,
         messages: [
-          { 
-            role: 'system', 
+          {
+            role: 'system',
             content: GROKIPEDIA_SYSTEM_PROMPT,
             // Mark system prompt for caching to reduce costs on repeated calls
             cache_control: { type: 'ephemeral' }
@@ -174,26 +174,26 @@ serve(async (req) => {
     // Create a transform stream to handle SSE
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
-    
+
     let fullResponse = '';
-    
+
     const stream = new ReadableStream({
       async start(controller) {
         const reader = openRouterResponse.body!.getReader();
-        
+
         try {
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            
+
             const chunk = decoder.decode(value);
             const lines = chunk.split('\n').filter(line => line.trim() !== '');
-            
+
             for (const line of lines) {
               if (line.startsWith('data: ')) {
                 const data = line.slice(6);
                 if (data === '[DONE]') continue;
-                
+
                 try {
                   const parsed = JSON.parse(data);
                   const content = parsed.choices?.[0]?.delta?.content;
@@ -207,7 +207,7 @@ serve(async (req) => {
               }
             }
           }
-          
+
           // Cache the complete response
           // Wrapped in try-catch to prevent crashes from malformed responses or DB failures
           try {
@@ -215,7 +215,7 @@ serve(async (req) => {
               console.warn('Empty response received, skipping cache');
             } else {
               const result = JSON.parse(fullResponse);
-              
+
               if (!result.rewritten_article) {
                 console.warn('Malformed response: missing rewritten_article, skipping cache');
               } else {
@@ -228,7 +228,7 @@ serve(async (req) => {
                   onConflict: 'wikipedia_url',
                   ignoreDuplicates: false
                 });
-                
+
                 if (error) {
                   console.error('Database error while caching article:', error);
                 } else {
@@ -240,7 +240,7 @@ serve(async (req) => {
             // Log error but don't crash - streaming already completed successfully
             console.error('Failed to cache article (JSON parse or DB error):', e instanceof Error ? e.message : String(e));
           }
-          
+
           controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           controller.close();
         } catch (error) {

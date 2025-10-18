@@ -54,16 +54,29 @@ export default function TableOfContents({ targetRef, className }: TableOfContent
 
   return (
     <nav className={cn("text-sm", className)} aria-label="Table of contents">
-      <div className="font-semibold mb-2 text-[#202122]">Contents</div>
-      <ul className="space-y-1">
-        {items.map((it) => (
-          <li key={it.id} className={cn("truncate", activeId === it.id && "text-[#0645ad] font-medium")}>
+      <div className="font-bold mb-3 text-[#202122] text-base border-b border-[#a2a9b1] pb-2">
+        Contents
+      </div>
+      <ul className="space-y-2">
+        {items.map((it, idx) => (
+          <li key={it.id} className={cn("leading-relaxed")}>
             <button
               type="button"
-              className={cn("text-left hover:underline", it.level === 1 && "pl-0", it.level === 2 && "pl-0", it.level === 3 && "pl-3", it.level === 4 && "pl-6", it.level >= 5 && "pl-8")}
+              className={cn(
+                "text-left hover:underline w-full text-[#0645ad] hover:text-[#0b5cb5] transition-colors",
+                it.level === 1 && "pl-0 font-semibold",
+                it.level === 2 && "pl-0 font-medium",
+                it.level === 3 && "pl-4 text-xs",
+                it.level === 4 && "pl-6 text-xs",
+                it.level >= 5 && "pl-8 text-xs",
+                activeId === it.id && "font-bold text-[#202122]"
+              )}
               onClick={() => handleClick(it.id)}
               aria-current={activeId === it.id ? 'location' : undefined}
             >
+              <span className="mr-2 text-[#54595d] font-normal">
+                {it.level <= 2 ? `${idx + 1}` : ''}
+              </span>
               {it.text}
             </button>
           </li>

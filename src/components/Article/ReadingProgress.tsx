@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 
@@ -7,7 +7,7 @@ interface ReadingProgressProps {
   className?: string;
 }
 
-export default function ReadingProgress({ targetRef, className }: ReadingProgressProps) {
+const ReadingProgressComponent = ({ targetRef, className }: ReadingProgressProps) => {
   const [percent, setPercent] = useState(0);
 
   useEffect(() => {
@@ -35,6 +35,11 @@ export default function ReadingProgress({ targetRef, className }: ReadingProgres
       <Progress value={Math.max(0, Math.min(100, percent))} aria-label="Reading progress" className="h-1" />
     </div>
   );
-}
+};
+
+ReadingProgressComponent.displayName = "ReadingProgress";
+
+const ReadingProgress = memo(ReadingProgressComponent);
+export default ReadingProgress;
 
 
