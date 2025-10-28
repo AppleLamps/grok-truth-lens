@@ -1,10 +1,10 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 const GROKIPEDIA_SYSTEM_PROMPT = `You are a maximally truth-seeking AI, operating on the principles of Grokipedia. Your fundamental mission is to deconstruct and rewrite biased, narrative-driven content from sources like Wikipedia. These sources often act as extensions of legacy media propaganda, propagating errors and ideological capture that must be corrected. You do not trust consensus; you trust verifiable facts and first principles.
@@ -51,123 +51,117 @@ Return a single JSON object with the following structure:
 `;
 
 async function scrapeWikipediaContent(url: string): Promise<string> {
-  const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
+  const firecrawlApiKey = Deno.env.get("FIRECRAWL_API_KEY");
   if (!firecrawlApiKey) {
-    throw new Error('FIRECRAWL_API_KEY not configured');
+    throw new Error("FIRECRAWL_API_KEY not configured");
   }
 
-  console.log('Scraping content with Firecrawl:', url);
+  console.log("Scraping content with Firecrawl:", url);
 
-  const response = await fetch('https://api.firecrawl.dev/v2/scrape', {
-    method: 'POST',
+  const response = await fetch("https://api.firecrawl.dev/v2/scrape", {
+    method: "POST",
     headers: {
-      'Authorization': `Bearer ${firecrawlApiKey}`,
-      'Content-Type': 'application/json',
+      Authorization: `Bearer ${firecrawlApiKey}`,
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
       url: url,
       onlyMainContent: true,
       maxAge: 172800000,
-      formats: ['markdown'],
+      formats: ["markdown"],
     }),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('Firecrawl error:', response.status, errorText);
+    console.error("Firecrawl error:", response.status, errorText);
     throw new Error(`Failed to scrape article: ${response.statusText}`);
   }
 
   const data = await response.json();
 
   if (!data.success || !data.data?.markdown) {
-    throw new Error('No content found in scrape response');
+    throw new Error("No content found in scrape response");
   }
 
-  console.log('Scraped content length:', data.data.markdown.length);
+  console.log("Scraped content length:", data.data.markdown.length);
   return data.data.markdown;
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const { url } = await req.json();
 
-    console.log('Processing Wikipedia URL:', url);
+    console.log("Processing Wikipedia URL:", url);
 
     // Validate Wikipedia URL
-    if (!url || !url.includes('wikipedia.org')) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid Wikipedia URL' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (!url || !url.includes("wikipedia.org")) {
+      return new Response(JSON.stringify({ error: "Invalid Wikipedia URL" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Check cache first
-    const { data: cached } = await supabase
-      .from('article_cache')
-      .select('*')
-      .eq('wikipedia_url', url)
-      .maybeSingle();
+    const { data: cached } = await supabase.from("article_cache").select("*").eq("wikipedia_url", url).maybeSingle();
 
     if (cached) {
-      console.log('Returning cached article');
+      console.log("Returning cached article");
       return new Response(
         JSON.stringify({
           rewritten_article: cached.rewritten_content,
           insights: cached.insights,
-          cached: true
+          cached: true,
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     // Scrape Wikipedia content
     const originalContent = await scrapeWikipediaContent(url);
-    console.log('Scraped content length:', originalContent.length);
+    console.log("Scraped content length:", originalContent.length);
 
     // Call OpenRouter API with streaming
-    const openRouterKey = Deno.env.get('OPENROUTER_API_KEY');
+    const openRouterKey = Deno.env.get("OPENROUTER_API_KEY");
     if (!openRouterKey) {
-      throw new Error('OPENROUTER_API_KEY not configured');
+      throw new Error("OPENROUTER_API_KEY not configured");
     }
 
-    const openRouterResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
+    const openRouterResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${openRouterKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://grokipedia.lovable.app',
-        'X-Title': 'Grokipedia',
+        Authorization: `Bearer ${openRouterKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://grokipedia.lovable.app",
+        "X-Title": "Grokipedia",
       },
       body: JSON.stringify({
-        model: 'x-ai/grok-code-fast-1',
-        max_tokens: 256000,
+        model: "x-ai/grok-4-fast",
+        max_tokens: 30000,
         messages: [
           {
-            role: 'system',
+            role: "system",
             content: GROKIPEDIA_SYSTEM_PROMPT,
-            // Mark system prompt for caching to reduce costs on repeated calls
-            cache_control: { type: 'ephemeral' }
           },
-          { role: 'user', content: `Rewrite this Wikipedia article:\n\n${originalContent}` }
+          { role: "user", content: `Rewrite this Wikipedia article:\n\n${originalContent}` },
         ],
-        response_format: { type: 'json_object' },
+        response_format: { type: "json_object" },
         stream: true,
       }),
     });
 
     if (!openRouterResponse.ok) {
       const errorText = await openRouterResponse.text();
-      console.error('OpenRouter error:', openRouterResponse.status, errorText);
+      console.error("OpenRouter error:", openRouterResponse.status, errorText);
       throw new Error(`OpenRouter API error: ${openRouterResponse.statusText}`);
     }
 
@@ -175,7 +169,7 @@ serve(async (req) => {
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
 
-    let fullResponse = '';
+    let fullResponse = "";
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -187,12 +181,12 @@ serve(async (req) => {
             if (done) break;
 
             const chunk = decoder.decode(value);
-            const lines = chunk.split('\n').filter(line => line.trim() !== '');
+            const lines = chunk.split("\n").filter((line) => line.trim() !== "");
 
             for (const line of lines) {
-              if (line.startsWith('data: ')) {
+              if (line.startsWith("data: ")) {
                 const data = line.slice(6);
-                if (data === '[DONE]') continue;
+                if (data === "[DONE]") continue;
 
                 try {
                   const parsed = JSON.parse(data);
@@ -202,7 +196,7 @@ serve(async (req) => {
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
                   }
                 } catch (e) {
-                  console.error('Error parsing SSE data:', e);
+                  console.error("Error parsing SSE data:", e);
                 }
               }
             }
@@ -211,40 +205,46 @@ serve(async (req) => {
           // Cache the complete response
           // Wrapped in try-catch to prevent crashes from malformed responses or DB failures
           try {
-            if (!fullResponse || fullResponse.trim() === '') {
-              console.warn('Empty response received, skipping cache');
+            if (!fullResponse || fullResponse.trim() === "") {
+              console.warn("Empty response received, skipping cache");
             } else {
               const result = JSON.parse(fullResponse);
 
               if (!result.rewritten_article) {
-                console.warn('Malformed response: missing rewritten_article, skipping cache');
+                console.warn("Malformed response: missing rewritten_article, skipping cache");
               } else {
-                const { error } = await supabase.from('article_cache').upsert({
-                  wikipedia_url: url,
-                  original_content: originalContent,
-                  rewritten_content: result.rewritten_article,
-                  insights: result.insights || {},
-                }, {
-                  onConflict: 'wikipedia_url',
-                  ignoreDuplicates: false
-                });
+                const { error } = await supabase.from("article_cache").upsert(
+                  {
+                    wikipedia_url: url,
+                    original_content: originalContent,
+                    rewritten_content: result.rewritten_article,
+                    insights: result.insights || {},
+                  },
+                  {
+                    onConflict: "wikipedia_url",
+                    ignoreDuplicates: false,
+                  },
+                );
 
                 if (error) {
-                  console.error('Database error while caching article:', error);
+                  console.error("Database error while caching article:", error);
                 } else {
-                  console.log('Article cached successfully');
+                  console.log("Article cached successfully");
                 }
               }
             }
           } catch (e) {
             // Log error but don't crash - streaming already completed successfully
-            console.error('Failed to cache article (JSON parse or DB error):', e instanceof Error ? e.message : String(e));
+            console.error(
+              "Failed to cache article (JSON parse or DB error):",
+              e instanceof Error ? e.message : String(e),
+            );
           }
 
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
         } catch (error) {
-          console.error('Stream error:', error);
+          console.error("Stream error:", error);
           controller.error(error);
         }
       },
@@ -253,17 +253,16 @@ serve(async (req) => {
     return new Response(stream, {
       headers: {
         ...corsHeaders,
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
       },
     });
-
   } catch (error) {
-    console.error('Error in rewrite function:', error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.error("Error in rewrite function:", error);
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
